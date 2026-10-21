@@ -130,6 +130,57 @@
   color: white;
 }
 
+/* Main-page title: same violet → magenta gradient as the Continue CTA, with a
+   white outline (stroke sits behind the fill via paint-order) and a looping
+   type-on animation with a blinking caret. */
+@utility typing-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  padding-right: 0.15em;
+  animation: typing-reveal 2.4s steps(18, end) 0.4s infinite alternate;
+
+  > span {
+    background-image: linear-gradient(90deg, var(--color-brand-violet), var(--color-brand-magenta));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-stroke: 0.3px rgba(255, 255, 255, 0.85);
+    paint-order: stroke fill;
+  }
+
+  &::after {
+    content: '';
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 0.08em;
+    vertical-align: -0.1em;
+    background: var(--color-brand-magenta);
+    animation: caret-blink 0.75s step-end infinite;
+  }
+}
+
+@keyframes typing-reveal {
+  from {
+    width: 0;
+  }
+  to {
+    width: 18ch;
+  }
+}
+
+@keyframes caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
 /* ---------- Full-screen ad overlay (interstitial / rewarded) ---------- */
 /* While a native GAM full-screen ad is open we blur the app behind it, so the
    page reads as a soft dimmed backdrop like the reference interstitials. The ad

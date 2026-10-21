@@ -28,7 +28,8 @@ export default function WelcomePage() {
   return (
     <OnboardingLayout
       step={0}
-      title="Welcome live Video Call"
+      title="Random Video Call"
+      titleTyping
       description="Select your range to help customize your profile and interactions."
       footer={
         <Link

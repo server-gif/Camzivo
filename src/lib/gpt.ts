@@ -24,7 +24,7 @@
  * slot on the *other* tag (odd/even rotation, see `nextAdUnit`).
  */
 
-import { adUnits, gamEnabled, nextAdUnit } from '@/config/ads';
+import { adUnits, gamEnabled, nextAdUnit, type GamRotatingPlacement } from '@/config/ads';
 
 const GPT_SRC = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js';
 const GPT_SCRIPT_ID = 'gam-gpt-loader';
@@ -256,6 +256,38 @@ export function mountInPageSlot(
     /* an ad that cannot be shown should not take the page down with it */
     return null;
   }
+}
+
+/**
+ * Mount a rotating in-page slot (banner / anchor) on the next tag of the
+ * odd/even rotation, and — when GAM answers that request with *no ad* —
+ * immediately remount it on the *other* configured tag, up to one attempt per
+ * configured unit. This is what makes the two live tags work as a fallback
+ * pair: a no-fill on one unit transparently tries the other instead of leaving
+ * the slot empty for the whole page view. `onFilled` only reports the outcome
+ * of the final attempt, so the container never flashes for a spent request.
+ */
+export function mountRotatingSlot(
+  gpt: Googletag,
+  placement: GamRotatingPlacement,
+  size: unknown,
+  divId: string,
+  onFilled?: (filled: boolean) => void,
+): void {
+  const maxAttempts = Math.max(1, adUnits[placement].length);
+  let attempts = 0;
+  const request = (): void => {
+    attempts += 1;
+    mountInPageSlot(gpt, nextAdUnit(placement), size, divId, (filled) => {
+      if (!filled && attempts < maxAttempts) {
+        // No-fill on this tag: silently retry on the next one in the rotation.
+        request();
+        return;
+      }
+      onFilled?.(filled);
+    });
+  };
+  request();
 }
 
 /**

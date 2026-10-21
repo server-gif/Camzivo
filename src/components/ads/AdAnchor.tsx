@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
 import { Minus } from 'lucide-react';
-import { gamEnabled, nextAdUnit } from '@/config/ads';
-import { getGpt, mountInPageSlot } from '@/lib/gpt';
+import { gamEnabled } from '@/config/ads';
+import { getGpt, mountRotatingSlot } from '@/lib/gpt';
 import { cn } from '@/lib/utils';
 
 /** Mobile-first sizes for the bottom anchor strip. */
@@ -10,6 +10,11 @@ const ANCHOR_SIZES: unknown[] = [
   [320, 50],
   [320, 100],
   [300, 100],
+  // Live GAM check: the anchor units returned no-ad for the mobile strip sizes
+  // only, so also accept the standard box sizes the account's creatives are
+  // booked at (same inventory the banner/interstitial slots serve).
+  [300, 250],
+  [320, 480],
 ];
 
 /** Unique div id — GPT requires a globally unique slot element id. */
@@ -22,11 +27,10 @@ const ANCHOR_DIV_ID = 'gam-anchor-slot';
  * standard ad unit path fills it and we can add our own minimize control.
  *
  * Odd/even tag rotation: on every navigation the component takes the *next*
- * anchor tag from the rotation and calls mountInPageSlot which destroys the
- * previous slot and redefines a new one on the other unit. This keeps both live
- * anchor tags receiving traffic without depending on the out-of-page ANCHOR
- * format (which requires a special anchor-enabled unit and mobile-optimized
- * page eligibility that live GAM units often lack).
+ * anchor tag from the rotation via mountRotatingSlot, which destroys the
+ * previous slot and, if GAM answers with no ad, immediately retries the *other*
+ * configured tag — so an empty unit transparently falls back to its pair
+ * instead of leaving the bar collapsed all page view.
  *
  * Behaviour: while the creative fills it shows at full size; the minimize button
  * removes the whole bar in one tap. Until an ad actually fills, the strip stays
@@ -48,9 +52,10 @@ export function AdAnchor() {
     void (async () => {
       const gpt = await getGpt();
       if (!gpt) return;
-      // mountInPageSlot destroys the stale slot from the previous page before
-      // defining a new one on the next tag in the odd/even rotation.
-      mountInPageSlot(gpt, nextAdUnit('anchor'), ANCHOR_SIZES, ANCHOR_DIV_ID, setFilled);
+      // mountRotatingSlot destroys the stale slot from the previous page, takes
+      // the next tag in the odd/even rotation, and retries the other tag on a
+      // no-fill response.
+      mountRotatingSlot(gpt, 'anchor', ANCHOR_SIZES, ANCHOR_DIV_ID, setFilled);
     })();
   }, [location.pathname, minimized]);
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { gamEnabled, nextAdUnit } from '@/config/ads';
-import { getGpt, mountInPageSlot } from '@/lib/gpt';
+import { gamEnabled } from '@/config/ads';
+import { getGpt, mountRotatingSlot } from '@/lib/gpt';
 
 /**
  * A single medium-rectangle (300x250) — the classic Google "box" ad. Listing
@@ -16,11 +16,12 @@ const BANNER_DIV_ID = 'gam-banner-slot';
  * The boxed top banner, rendered inside the onboarding layout directly above
  * each screen's title. It mounts a GPT in-page slot into a bordered
  * "Advertisement" frame that inherits the card's width and padding. Because it
- * lives in the per-screen layout it remounts on every navigation; mountInPageSlot
+ * lives in the per-screen layout it remounts on every navigation; mountRotatingSlot
  * destroys the previous screen's slot first, so the fixed div id stays valid.
- * Each remount takes the next banner tag from the odd/even rotation, so both
- * configured units keep receiving requests. When `VITE_GAM_ENABLED` is off it
- * renders nothing at all.
+ * Each remount takes the next banner tag from the odd/even rotation, and if GAM
+ * answers with no ad on that tag it immediately retries the other one, so the
+ * box fills whenever either live unit has a creative. When `VITE_GAM_ENABLED`
+ * is off it renders nothing at all.
  */
 export function AdBanner() {
   const mounted = useRef(false);
@@ -36,7 +37,7 @@ export function AdBanner() {
     void (async () => {
       const gpt = await getGpt();
       if (!gpt) return;
-      mountInPageSlot(gpt, nextAdUnit('banner'), BANNER_SIZES, BANNER_DIV_ID);
+      mountRotatingSlot(gpt, 'banner', BANNER_SIZES, BANNER_DIV_ID);
     })();
   }, []);
 

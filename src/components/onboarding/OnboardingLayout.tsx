@@ -7,6 +7,8 @@ type OnboardingLayoutProps = {
   /** Position in the onboarding stepper. Omit to hide the progress bar entirely. */
   step?: number;
   title: string;
+  /** Renders the title with the gradient + type-on animation (main page only). */
+  titleTyping?: boolean;
   description?: ReactNode;
   children?: ReactNode;
   /** Pinned to the bottom of the panel — the Continue/Enter CTA. */
@@ -27,7 +29,7 @@ type OnboardingLayoutProps = {
  * BELOW that block in normal document flow, so the page's main scrollbar scrolls
  * down to read it. There is no fixed/sticky overlay and no inner scrollbar.
  */
-export function OnboardingLayout({ step, title, description, children, footer, footerNote, className }: OnboardingLayoutProps) {
+export function OnboardingLayout({ step, title, titleTyping, description, children, footer, footerNote, className }: OnboardingLayoutProps) {
   return (
     <FlowPanel className={className}>
       <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col">
@@ -41,7 +43,15 @@ export function OnboardingLayout({ step, title, description, children, footer, f
           {/* Boxed Google ad sits directly above the screen title. */}
           <AdBanner />
           <div className="pt-[38px] text-center">
-            <h1 className=" font-bold text-[20px]">{title}</h1>
+            <h1 className={`font-bold ${titleTyping ? 'text-[28px]' : 'text-[20px]'}`}>
+              {titleTyping ? (
+                <span className="typing-text">
+                  <span>{title}</span>
+                </span>
+              ) : (
+                title
+              )}
+            </h1>
             {description ? <div className="mx-auto mt-2.5 max-w-sm text-[12px] leading-relaxed text-fg-muted">{description}</div> : null}
           </div>
           {children ? <div className="mt-[52px] flex-1">{children}</div> : <div className="flex-1" />}

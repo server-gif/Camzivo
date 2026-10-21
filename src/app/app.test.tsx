@@ -8,7 +8,7 @@ const adult = { ageConfirmed: true };
 describe('welcome step', () => {
   it('is the home screen and starts the flow from the Continue button', async () => {
     const { user, router } = renderRoute('/');
-    expect(await screen.findByRole('heading', { level: 1, name: /welcome live video call/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /Random video call/i })).toBeInTheDocument();
 
     await user.click(within(screen.getByRole('main')).getByRole('link', { name: /^continue$/i }));
     expect(router.state.location.pathname).toBe('/age');
