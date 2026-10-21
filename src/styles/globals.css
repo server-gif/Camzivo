@@ -1,0 +1,223 @@
+@import 'tailwindcss';
+
+/* ---------- Design tokens ---------- */
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Inter Display', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --color-ink-950: #0b1020;
+  --color-ink-900: #10162b;
+  --color-ink-850: #141b34;
+  --color-ink-800: #1a2242;
+  --color-ink-700: #263055;
+  --color-ink-600: #36416b;
+
+  /* Purple "plum" surfaces for the onboarding panel and choice cards. */
+  --color-plum-950: #120a2a;
+  --color-plum-900: #1d1438;
+  --color-plum-800: #241a45;
+
+  --color-fg: #eef0fa;
+  --color-fg-muted: #a6aeca;
+  --color-fg-subtle: #7f88a8;
+
+  --color-violet: #8b5cf6;
+  --color-violet-strong: #7c3aed;
+  --color-violet-soft: #c4b5fd;
+  --color-cyan: #22d3ee;
+  --color-cyan-soft: #a5f3fc;
+
+  /* Brand gradient endpoints (CTA bar and icon discs). */
+  --color-brand-violet: #6d5cff;
+  --color-brand-magenta: #c33bf0;
+
+  --color-danger: #fb7185;
+  --color-danger-bg: #3b1424;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+
+  /* Live badge green (user-specified brand green for the "Live" tag). */
+  --color-live: #05a141;
+
+  --radius-card: 1.25rem;
+
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-float: float 7s ease-in-out infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+}
+
+/* ---------- Base ---------- */
+@layer base {
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-ink-950 text-fg font-sans antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight text-balance;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-cyan);
+    outline-offset: 3px;
+    border-radius: 0.5rem;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-violet) 55%, transparent);
+  }
+  [id] {
+    scroll-margin-top: 5.5rem;
+  }
+}
+
+/* ---------- Utilities ---------- */
+@utility text-gradient {
+  background-image: linear-gradient(100deg, var(--color-violet-soft), var(--color-cyan) 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility bg-glow {
+  background-image:
+    radial-gradient(60rem 30rem at 15% -10%, color-mix(in oklab, var(--color-violet) 22%, transparent), transparent 70%),
+    radial-gradient(45rem 25rem at 95% 10%, color-mix(in oklab, var(--color-cyan) 14%, transparent), transparent 70%);
+}
+
+@utility surface {
+  background: color-mix(in oklab, var(--color-ink-850) 85%, transparent);
+  border: 1px solid color-mix(in oklab, white 8%, transparent);
+  border-radius: var(--radius-card);
+}
+
+/* Primary onboarding CTA: violet → magenta bar, used via buttonVariants({ variant: 'gradient' }). */
+@utility btn-gradient {
+  background-image: linear-gradient(90deg, var(--color-brand-violet), var(--color-brand-magenta));
+  color: white;
+}
+
+/* ---------- Full-screen ad overlay (interstitial / rewarded) ---------- */
+/* While a native GAM full-screen ad is open we blur the app behind it, so the
+   page reads as a soft dimmed backdrop like the reference interstitials. The ad
+   overlay itself is injected into <body> outside #root, so it stays sharp. */
+body.gam-ad-open #root {
+  filter: blur(12px);
+  transition: filter 0.25s ease;
+}
+
+/* ---------- Custom interstitial modal (mirrors the reference site) ---------- */
+/* The GAM interstitial creative is served into an in-page slot inside this
+   always-present, hidden overlay. `showInterstitial` toggles `.inter--open` on
+   every Continue click; the app behind the semi-transparent, blurred backdrop
+   dims out, and navigation only resumes once the user taps Close. */
+.inter {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 8, 6, 0.55);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.inter--open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+.inter__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+}
+.inter__close {
+  align-self: flex-end;
+  border: 1px solid rgba(250, 246, 239, 0.45);
+  border-radius: 999px;
+  background: transparent;
+  color: #faf6ef;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 18px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.inter__close:hover {
+  background: rgba(250, 246, 239, 0.14);
+  border-color: rgba(250, 246, 239, 0.75);
+}
+.inter__card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  max-width: 100%;
+  max-height: calc(100dvh - 120px);
+  overflow: hidden;
+}
+.inter__ad {
+  min-width: min(300px, 100%);
+  min-height: 250px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.inter__ad iframe {
+  display: block;
+  max-width: 100%;
+  border: 0;
+}
+
+/* ---------- Motion preferences ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
