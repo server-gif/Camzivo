@@ -14,7 +14,12 @@
  * The rewarded placement uses GPT's *out-of-page* REWARDED format, but only on
  * mobile-shaped viewports — Google wraps the overlay in an un-styleable white
  * backdrop on desktop, so wide screens fall back to the dark interstitial
- * modal below. The interstitial instead uses
+ * modal below. The anchor placement is the Google-*managed* out-of-page ANCHOR
+ * format (the GAM equivalent of AdSense anchor ads, see
+ * support.google.com/adsense/answer/15484692): a dismissible strip that sticks
+ * to the viewport edge (bottom on mobile, side rail on desktop) and can expand
+ * into a dynamic anchor — Google injects and owns that overlay, we only define
+ * and rotate the slot. The interstitial instead uses
  * an ordinary *in-page* slot that lives inside a custom blurred full-screen
  * modal (`.inter` in globals.css), mirroring the reference site: the modal is
  * kept in the DOM permanently and pre-filled, and `showInterstitial` reveals it
@@ -96,6 +101,15 @@ let rewardedSlot: GptSlot | null = null;
 let rewardedReadyEvent: GptEvent | null = null;
 let rewardedWanted = false;
 
+// Google-managed out-of-page anchor ad (the GAM equivalent of an AdSense anchor
+// ad per the "About anchor ads" doc): a dismissible, possibly dynamic (auto-
+// expanding) strip that sticks to the viewport edge and serves on mobile and
+// desktop. Defined once at boot on the first tag of the odd/even rotation;
+// `rotateAnchor` rebuilds it on the other tag at every navigation. Only
+// anchor-format requests get Google's anchor inventory, so this replaces the
+// earlier custom in-page bottom bar by explicit request.
+let anchorSlot: GptSlot | null = null;
+
 // Persistent custom modal for the interstitial. It is built once at boot and
 // kept in the DOM (hidden) so GPT renders the creative into an in-page slot
 // inside it; we reveal/hide it on demand. `hasAd` tracks whether the last
@@ -146,6 +160,21 @@ export function getGpt(): Promise<Googletag | null> {
         rewardedSlot = null;
       }
 
+      // Define the Google-managed out-of-page anchor slot now, before
+      // enableServices(), so its first request joins the initial load. Guarded
+      // on the enum existing: an undefined format would make
+      // defineOutOfPageSlot fall back to an interstitial, which is not what we
+      // want here. The unit comes from the odd/even rotation (first tag);
+      // `rotateAnchor` swaps to the other one on every navigation.
+      try {
+        if (oop?.ANCHOR != null) {
+          anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
+          if (anchorSlot) anchorSlot.addService(pubads);
+        }
+      } catch {
+        anchorSlot = null;
+      }
+
       // Rewarded fires this when the fetched ad is ready. Only reveal it once the
       // app has asked (Welcome page calls showRewarded); never pop it unprompted.
       try {
@@ -157,16 +186,21 @@ export function getGpt(): Promise<Googletag | null> {
         /* older builds without the event still resolve via the timeout */
       }
 
-      // Deliberately NOT enabling single-request mode: the in-page banner and
-      // anchor are defined from React effects that run *after* enableServices(),
-      // so each has to fetch on its own (async rendering) via a targeted refresh.
-      // The out-of-page rewarded slot is defined above, before it.
+      // Deliberately NOT enabling single-request mode: the in-page banner is
+      // defined from a React effect that runs *after* enableServices(), so it
+      // has to fetch on its own (async rendering) via a targeted refresh. The
+      // out-of-page rewarded and anchor slots are defined above, before it.
       gpt.enableServices();
 
       // Render the rewarded slot now rather than at ask time: the overlay can
       // only be shown once GPT has built it, so warming it here is what lets a
       // page deeper in the flow (the girl-find screen) show it immediately.
       if (rewardedSlot) reveal(gpt, rewardedSlot);
+
+      // Render the managed anchor overlay too. It is a persistent, Google-
+      // owned strip (collapse/dismiss UI included) that follows the user
+      // across routes, so revealing it once at boot puts it on every page.
+      if (anchorSlot) reveal(gpt, anchorSlot);
 
       // Build the custom interstitial modal and fire its first request now, so
       // the creative is loaded before the user acts.
@@ -259,7 +293,7 @@ export function mountInPageSlot(
 }
 
 /**
- * Mount a rotating in-page slot (banner / anchor) on the next tag of the
+ * Mount a rotating in-page slot (the top banner) on the next tag of the
  * odd/even rotation, and — when GAM answers that request with *no ad* —
  * immediately remount it on the *other* configured tag, up to one attempt per
  * configured unit. This is what makes the two live tags work as a fallback
@@ -343,6 +377,40 @@ export function warmRewarded(): void {
   if (!gamEnabled || typeof document === 'undefined') return;
   void getGpt().then((gpt) => {
     if (gpt && !rewardedReadyEvent) requestRewarded(gpt);
+  });
+}
+
+/**
+ * Rebuild the Google-managed anchor on the *next* tag in the odd/even rotation.
+ * Called by `AdAnchor` on every navigation: the current overlay is destroyed,
+ * a fresh out-of-page ANCHOR slot is defined on the other unit, revealed, and
+ * requested — so an empty unit transparently hands over to its pair across
+ * page views. With a single configured tag this is a plain re-fetch.
+ */
+export function rotateAnchor(): void {
+  if (!gamEnabled || typeof document === 'undefined') return;
+  void getGpt().then((gpt) => {
+    if (!gpt) return;
+    const pubads = gpt.pubads();
+    try {
+      if (anchorSlot) gpt.destroySlots([anchorSlot]);
+    } catch {
+      /* a slot that refuses to die is still dropped from our reference */
+    }
+    anchorSlot = null;
+    const oop = gpt.enums?.OutOfPageFormat;
+    if (oop?.ANCHOR == null) return;
+    try {
+      anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
+      if (anchorSlot) {
+        anchorSlot.addService(pubads);
+        reveal(gpt, anchorSlot);
+        // The slot was defined after enableServices(), so ask for it explicitly.
+        pubads.refresh([anchorSlot], { changeCorrelator: false });
+      }
+    } catch {
+      anchorSlot = null;
+    }
   });
 }
 
