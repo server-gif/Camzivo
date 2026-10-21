@@ -82,8 +82,9 @@ export default function GirlFindPage() {
   return (
     <FlowPanel>
       {/* Same staging as the other flow screens: the first block fills the
-          viewport so the Connect button rests at the bottom edge, and the CRM
-          note sits below it in normal flow — the page scrollbar reaches it. */}
+          viewport so the Connect button rests at the bottom edge, and the CTA
+          bar is sticky so it stays pinned to the screen bottom even while the
+          long CRM note below makes the page scrollable on small phones. */}
       <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col">
         <div className="flex flex-1 flex-col">
           <AdBanner />
@@ -103,7 +104,7 @@ export default function GirlFindPage() {
           </div>
         </div>
 
-        <div className="pt-4">
+        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 bg-plum-950/90 px-5 pb-5 pt-4">
           {finding ? (
             <p
               role="status"

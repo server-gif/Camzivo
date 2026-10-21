@@ -8,9 +8,9 @@ import { getGpt, rotateAnchor } from '@/lib/gpt';
  * anchor ad (support.google.com/adsense/answer/15484692): a Google-managed,
  * dismissible strip that sticks to the edge of the viewport — bottom on mobile,
  * side rail on desktop — can expand into a *dynamic anchor*, and serves on both
- * form factors. The out-of-page ANCHOR slot is defined and revealed once inside
- * `getGpt` (see `src/lib/gpt.ts`), so this component's first job is to make sure
- * GPT has booted; Google injects and owns the overlay (collapse/dismiss UI
+ * form factors. The out-of-page BOTTOM_ANCHOR slot is defined and revealed once
+ * inside `getGpt` (see `src/lib/gpt.ts`), so this component's first job is to make
+ * sure GPT has booted; Google injects and owns the overlay (collapse/dismiss UI
  * included), so we render no DOM of our own. When `VITE_GAM_ENABLED` is off it
  * does nothing. Because it lives in RootLayout, booting it here puts the anchor
  * on every page.

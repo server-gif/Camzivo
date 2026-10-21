@@ -37,7 +37,7 @@ export function FlowPanel({ children, className, showLegalLine = true }: FlowPan
     <PageContainer showNav={false} showFooter={false} showHeader={false} className="bg-glow">
       <div
         className={cn(
-          'mx-auto flex min-h-dvh w-full max-w-[393px] flex-col gap-0 bg-plum-950/90 p-5 shadow-[0_24px_80px_-32px] shadow-black/70',
+          'mx-auto flex min-h-dvh w-full max-w-[393px] flex-col gap-0 bg-plum-950/90  shadow-[0_24px_80px_-32px] shadow-black/70',
           className,
         )}
       >

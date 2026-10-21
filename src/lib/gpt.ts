@@ -14,12 +14,14 @@
  * The rewarded placement uses GPT's *out-of-page* REWARDED format, but only on
  * mobile-shaped viewports — Google wraps the overlay in an un-styleable white
  * backdrop on desktop, so wide screens fall back to the dark interstitial
- * modal below. The anchor placement is the Google-*managed* out-of-page ANCHOR
- * format (the GAM equivalent of AdSense anchor ads, see
+ * modal below. The anchor placement is the Google-*managed* out-of-page
+ * BOTTOM_ANCHOR format (the GPT equivalent of AdSense anchor ads, see
  * support.google.com/adsense/answer/15484692): a dismissible strip that sticks
- * to the viewport edge (bottom on mobile, side rail on desktop) and can expand
- * into a dynamic anchor — Google injects and owns that overlay, we only define
- * and rotate the slot. The interstitial instead uses
+ * to the bottom edge of the screen and can expand into a dynamic anchor —
+ * Google injects and owns that overlay, we only define and rotate the slot.
+ * (GPT's enum has no plain `ANCHOR` key — checking for one silently killed the
+ * whole placement, which is the bug this comment documents.) The interstitial
+ * instead uses
  * an ordinary *in-page* slot that lives inside a custom blurred full-screen
  * modal (`.inter` in globals.css), mirroring the reference site: the modal is
  * kept in the DOM permanently and pre-filled, and `showInterstitial` reveals it
@@ -101,14 +103,31 @@ let rewardedSlot: GptSlot | null = null;
 let rewardedReadyEvent: GptEvent | null = null;
 let rewardedWanted = false;
 
-// Google-managed out-of-page anchor ad (the GAM equivalent of an AdSense anchor
+// Google-managed out-of-page anchor ad (the GPT equivalent of an AdSense anchor
 // ad per the "About anchor ads" doc): a dismissible, possibly dynamic (auto-
-// expanding) strip that sticks to the viewport edge and serves on mobile and
-// desktop. Defined once at boot on the first tag of the odd/even rotation;
-// `rotateAnchor` rebuilds it on the other tag at every navigation. Only
-// anchor-format requests get Google's anchor inventory, so this replaces the
-// earlier custom in-page bottom bar by explicit request.
+// expanding) strip that sticks to the bottom edge of the screen. Defined once
+// at boot on the first tag of the odd/even rotation; `rotateAnchor` rebuilds it
+// on the other tag at every navigation. Only anchor-format requests get
+// Google's anchor inventory, so this replaces the earlier custom in-page
+// bottom bar by explicit request.
 let anchorSlot: GptSlot | null = null;
+
+/**
+ * The out-of-page format for the anchor placement, or null when the loaded GPT
+ * build offers none. GPT exposes the AdSense-style anchor as `BOTTOM_ANCHOR`
+ * (the doc's bottom strip with the collapse/dismiss grippy) and `TOP_ANCHOR`;
+ * there is deliberately NO plain `ANCHOR` key, so probing only for one makes
+ * the whole placement silently dead. Prefer bottom, fall back to top, and keep
+ * `ANCHOR` last only for hypothetical builds that name it.
+ */
+function anchorFormat(oop: Record<string, number | undefined> | undefined): number | null {
+  if (!oop) return null;
+  for (const key of ['BOTTOM_ANCHOR', 'TOP_ANCHOR', 'ANCHOR'] as const) {
+    const value = oop[key];
+    if (value != null) return value;
+  }
+  return null;
+}
 
 // Persistent custom modal for the interstitial. It is built once at boot and
 // kept in the DOM (hidden) so GPT renders the creative into an in-page slot
@@ -161,14 +180,16 @@ export function getGpt(): Promise<Googletag | null> {
       }
 
       // Define the Google-managed out-of-page anchor slot now, before
-      // enableServices(), so its first request joins the initial load. Guarded
-      // on the enum existing: an undefined format would make
-      // defineOutOfPageSlot fall back to an interstitial, which is not what we
-      // want here. The unit comes from the odd/even rotation (first tag);
-      // `rotateAnchor` swaps to the other one on every navigation.
+      // enableServices(), so its first request joins the initial load. The
+      // format comes from `anchorFormat` (BOTTOM_ANCHOR on current GPT builds);
+      // when the loaded build offers no anchor format at all we skip defining
+      // the slot, since an undefined format would make defineOutOfPageSlot fall
+      // back to an interstitial. The unit comes from the odd/even rotation
+      // (first tag); `rotateAnchor` swaps to the other one on every navigation.
       try {
-        if (oop?.ANCHOR != null) {
-          anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
+        const anchorFmt = anchorFormat(oop);
+        if (anchorFmt != null) {
+          anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), anchorFmt) ?? null;
           if (anchorSlot) anchorSlot.addService(pubads);
         }
       } catch {
@@ -344,24 +365,37 @@ export function showInterstitial(): Promise<void> {
  * appears) via GPT's native out-of-page REWARDED overlay, using the rewarded
  * unit `adUnits.rewarded`. Rewarded creatives render through this native
  * overlay: on a phone viewport it plays as a full-screen video whose backdrop
- * belongs to Google; on desktop it is still eligible (the site declares a
- * `width=device-width` viewport meta) and fills the same overlay — its backdrop
- * is Google's own and lives in a cross-origin iframe we cannot restyle, so the
- * app behind it is blurred (`setAdBlur`) while the ad is up. We always attempt
+ * belongs to Google; on desktop the creative often does not render an overlay at
+ * all even though it reports as ready. The app behind it is therefore blurred
+ * only once the overlay is actually in the DOM (`blurOnceOverlayShown`), never
+ * just because a fill arrived — blurring on the ready event alone left the page
+ * behind an invisible overlay, i.e. a whole blurred screen with no ad (the
+ * camzivo girl-find report). We always attempt
  * the native overlay so the first page genuinely shows the rewarded ad; if no
  * creative is on hand within the fill timeout it resolves on its own and the
- * flow continues. Resolves once the user dismisses the ad.
+ * flow continues. When the native path cannot put anything on screen — no fill,
+ * or (the common desktop case) GPT marks the REWARDED format ineligible so the
+ * overlay is never drawn — we fall back to the interstitial modal, which DOES
+ * fill in-page slots, so the user always sees a real ad instead of an empty
+ * blurred screen. Resolves once the user dismisses the ad.
  */
 export function showRewarded(): Promise<void> {
   if (!gamEnabled || typeof document === 'undefined') return Promise.resolve();
 
   return getGpt().then((gpt) => {
     if (!gpt) return;
-    // Always go through the native rewarded overlay. The rewarded unit is known
-    // to fill (its creative returned on the live site), so the first page must
-    // actually reveal it via `makeRewardedVisible()` instead of silently
-    // substituting another format — the old desktop width-gate hid it entirely.
-    return showRewardedNative(gpt);
+    // Always go through the native rewarded overlay first. The rewarded unit is
+    // known to fill (its creative returned on the live site), so the first page
+    // must actually reveal it via `makeRewardedVisible()` instead of silently
+    // substituting another format. But on desktop GPT routinely reports the
+    // creative ready without ever drawing the overlay ("page is not mobile
+    // optimized"), which left girl-find blurred with no ad at all — so when the
+    // native path ends with nothing shown, fall back to the interstitial modal
+    // to guarantee a visible ad on every viewport.
+    return showRewardedNative(gpt).then((shown) => {
+      if (shown) return;
+      return showInterstitial();
+    });
   });
 }
 
@@ -383,8 +417,8 @@ export function warmRewarded(): void {
 /**
  * Rebuild the Google-managed anchor on the *next* tag in the odd/even rotation.
  * Called by `AdAnchor` on every navigation: the current overlay is destroyed,
- * a fresh out-of-page ANCHOR slot is defined on the other unit, revealed, and
- * requested — so an empty unit transparently hands over to its pair across
+ * a fresh out-of-page BOTTOM_ANCHOR slot is defined on the other unit, revealed,
+ * and requested — so an empty unit transparently hands over to its pair across
  * page views. With a single configured tag this is a plain re-fetch.
  */
 export function rotateAnchor(): void {
@@ -398,15 +432,17 @@ export function rotateAnchor(): void {
       /* a slot that refuses to die is still dropped from our reference */
     }
     anchorSlot = null;
-    const oop = gpt.enums?.OutOfPageFormat;
-    if (oop?.ANCHOR == null) return;
+    const anchorFmt = anchorFormat(gpt.enums?.OutOfPageFormat);
+    if (anchorFmt == null) return;
     try {
-      anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
+      anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), anchorFmt) ?? null;
       if (anchorSlot) {
         anchorSlot.addService(pubads);
         reveal(gpt, anchorSlot);
         // The slot was defined after enableServices(), so ask for it explicitly.
-        pubads.refresh([anchorSlot], { changeCorrelator: false });
+        // A full refresh (default correlator): a changeCorrelator:false one
+        // hands back the spent request instead of a new creative.
+        pubads.refresh([anchorSlot]);
       }
     } catch {
       anchorSlot = null;
@@ -578,22 +614,38 @@ function refillAdModal(modal: AdModal, gpt: Googletag): void {
  * page. Once the overlay is actually up, that short timer is dropped in favour
  * of the longer `REWARDED_SHOW_TIMEOUT_MS`, and `rewardedSlotClosed` normally
  * resolves well before it.
+ *
+ * Resolves `true` when an overlay really was rendered on screen (verified via
+ * DOM polling, not just the ready event), and `false` when nothing was shown
+ * (no fill, ineligible format, or the overlay closed on its own) so the caller
+ * can fall back to another placement.
  */
-function showRewardedNative(gpt: Googletag): Promise<void> {
-  if (!rewardedSlot) return Promise.resolve();
+function showRewardedNative(gpt: Googletag): Promise<boolean> {
+  if (!rewardedSlot) return Promise.resolve(false);
   const pubads = gpt.pubads();
 
-  return new Promise<void>((resolve) => {
+  return new Promise<boolean>((resolve) => {
     let settled = false;
     let fillTimer = 0;
     let showTimer = 0;
+    let blurTimer = 0;
+    // Whether a Google overlay was ever confirmed on screen during this ask.
+    let overlaySeen = false;
 
     function onReady() {
       if (settled) return;
       // Filled: stop counting the wait and let the ad run under its own cap.
       window.clearTimeout(fillTimer);
       showTimer = window.setTimeout(finish, REWARDED_SHOW_TIMEOUT_MS);
-      setAdBlur(true);
+      blurOnceOverlayShown(rewardedOverlayGone, (t) => {
+        blurTimer = t;
+        if (t === OVERLAY_CONFIRMED) overlaySeen = true;
+      }, finish);
+    }
+
+    /** Whether the rewarded overlay has left the DOM (closed or never drawn). */
+    function rewardedOverlayGone(): boolean {
+      return !rewardedOverlayPresent(rewardedSlot?.getSlotElementId());
     }
 
     function finish() {
@@ -602,6 +654,7 @@ function showRewardedNative(gpt: Googletag): Promise<void> {
       rewardedWanted = false;
       window.clearTimeout(fillTimer);
       window.clearTimeout(showTimer);
+      window.clearTimeout(blurTimer);
       try {
         pubads.removeEventListener('rewardedSlotReady', onReady);
         pubads.removeEventListener('rewardedSlotClosed', finish);
@@ -611,7 +664,7 @@ function showRewardedNative(gpt: Googletag): Promise<void> {
       setAdBlur(false);
       // Queue the next creative straight away so a later ask is already warm.
       requestRewarded(gpt);
-      resolve();
+      resolve(overlaySeen);
     }
 
     rewardedWanted = true;
@@ -635,7 +688,10 @@ function showRewardedNative(gpt: Googletag): Promise<void> {
         // call finish() (and requestRewarded → refresh) 3.5 s into a playing
         // video, which was the "rewarded ad auto-closes" bug.
         showTimer = window.setTimeout(finish, REWARDED_SHOW_TIMEOUT_MS);
-        setAdBlur(true);
+        blurOnceOverlayShown(rewardedOverlayGone, (t) => {
+          blurTimer = t;
+          if (t === OVERLAY_CONFIRMED) overlaySeen = true;
+        }, finish);
       } catch {
         // Could not show it: arm the fill timeout and request a fresh one.
         fillTimer = window.setTimeout(finish, REWARDED_FILL_TIMEOUT_MS);
@@ -678,6 +734,83 @@ function reveal(gpt: Googletag, slot: GptSlot, overlayFormat?: 'TOP'): void {
   } catch {
     /* out-of-page slots sometimes have no div to render into */
   }
+}
+
+/**
+ * Blur the app only while Google's rewarded overlay is actually on screen.
+ *
+ * GPT fires `rewardedSlotReady` (and even `makeRewardedVisible()`) without
+ * drawing any overlay when the creative is not eligible for the current
+ * viewport — typically on desktop ("page is not mobile optimized"). Blurring
+ * on the event alone then dims the page behind nothing, which is the "girl-find
+ * is all blurred, no ad" bug, so we poll for the out-of-page overlay container
+ * before turning the blur on and drop it again as soon as the overlay leaves
+ * the DOM. `onTimer` receives each scheduled poll timeout id (so the caller can
+ * clear it) and the `OVERLAY_CONFIRMED` sentinel once the overlay is verified
+ * on screen, letting the caller prove an ad was genuinely shown. When polling
+ * gives up without ever seeing the overlay, `onGiveUp` fires so the caller can
+ * settle immediately instead of holding the flow for the show-timeout cap.
+ */
+function blurOnceOverlayShown(
+  isGone: () => boolean,
+  onTimer?: (timer: number) => void,
+  onGiveUp?: () => void,
+): void {
+  let waits = 0;
+  const tick = () => {
+    if (isGone()) {
+      // The overlay never arrived (or already closed): give up after ~1.5s and
+      // keep the page un-blurred — an invisible overlay must not dim the app.
+      waits += 1;
+      if (waits < 15) {
+        onTimer?.(window.setTimeout(tick, 100));
+      } else {
+        onGiveUp?.();
+      }
+      return;
+    }
+    onTimer?.(OVERLAY_CONFIRMED);
+    setAdBlur(true);
+    // Once up, keep watching: the native close button lives inside Google's
+    // iframe and does not always emit `rewardedSlotClosed`, so the blur also
+    // ends when the overlay container is removed/emptied from the DOM.
+    const guard = window.setInterval(() => {
+      if (isGone()) {
+        setAdBlur(false);
+        window.clearInterval(guard);
+      }
+    }, 200);
+  };
+  onTimer?.(window.setTimeout(tick, 100));
+}
+
+/**
+ * Sentinel passed to `blurOnceOverlayShown`'s `onTimer` in place of a real
+ * timeout id once the overlay is confirmed on screen. Real `setTimeout` ids in
+ * this context are positive, so a negative sentinel cannot collide.
+ */
+const OVERLAY_CONFIRMED = -1;
+
+/**
+ * Whether GPT has actually rendered the rewarded out-of-page overlay into the
+ * body. GPT places each out-of-page slot in a body-level container named after
+ * the slot's element id, so scoping the search to that container excludes the
+ * anchor strip and every other slot by construction. The overlay only counts
+ * as shown when the container holds an iframe AND has real layout size — GPT
+ * leaves the container collapsed (`display:none`/zero height) when the format
+ * is ineligible for the viewport, which is exactly the desktop no-render case.
+ */
+function rewardedOverlayPresent(slotDivId?: string): boolean {
+  if (typeof document === 'undefined' || !slotDivId) return false;
+  // GPT's container id is the slot element id, possibly with a suffix; match
+  // the exact id first, then any body-level element whose id starts with it.
+  let container = document.getElementById(slotDivId);
+  if (!container) {
+    container = document.querySelector<HTMLElement>(`body > [id^="${CSS.escape(slotDivId)}"]`);
+  }
+  if (!container || !container.querySelector('iframe')) return false;
+  const box = container.getBoundingClientRect();
+  return box.width > 0 && box.height > 0;
 }
 
 /** Toggle the blurred-app backdrop while a full-screen ad is open. */
