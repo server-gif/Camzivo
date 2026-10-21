@@ -276,35 +276,27 @@ export function showInterstitial(): Promise<void> {
 /**
  * Show the rewarded ad (Welcome on mount; girl-find when the Connect button
  * appears) via GPT's native out-of-page REWARDED overlay, using the rewarded
- * unit `adUnits.rewarded`. Rewarded creatives only render through this native
- * overlay on *mobile-shaped* viewports, where it plays as a full-screen video
- * whose backdrop belongs to Google. On desktop / wide viewports GPT either
- * refuses the slot ("page is not mobile optimized") or wraps the creative in
- * a white cross-origin iframe we cannot restyle — so there we fall back to
- * our own dark modal (fed by the interstitial rotation), which always shows
- * with the app's plum backdrop instead of white. Resolves once the user
- * dismisses the ad.
+ * unit `adUnits.rewarded`. Rewarded creatives render through this native
+ * overlay: on a phone viewport it plays as a full-screen video whose backdrop
+ * belongs to Google; on desktop it is still eligible (the site declares a
+ * `width=device-width` viewport meta) and fills the same overlay — its backdrop
+ * is Google's own and lives in a cross-origin iframe we cannot restyle, so the
+ * app behind it is blurred (`setAdBlur`) while the ad is up. We always attempt
+ * the native overlay so the first page genuinely shows the rewarded ad; if no
+ * creative is on hand within the fill timeout it resolves on its own and the
+ * flow continues. Resolves once the user dismisses the ad.
  */
 export function showRewarded(): Promise<void> {
   if (!gamEnabled || typeof document === 'undefined') return Promise.resolve();
 
   return getGpt().then((gpt) => {
     if (!gpt) return;
-    if (!isMobileViewport()) {
-      // Desktop: the native overlay would flash Google's white backdrop, so
-      // show the styleable dark modal on the interstitial rotation instead.
-      if (interstitialModal) return openAdModal(interstitialModal, gpt);
-      return;
-    }
+    // Always go through the native rewarded overlay. The rewarded unit is known
+    // to fill (its creative returned on the live site), so the first page must
+    // actually reveal it via `makeRewardedVisible()` instead of silently
+    // substituting another format — the old desktop width-gate hid it entirely.
     return showRewardedNative(gpt);
   });
-}
-
-/** Rewarded overlays are only served (and only full-screen) on phone viewports. */
-function isMobileViewport(): boolean {
-  const w = window as Window & { matchMedia?: (query: string) => { matches: boolean } };
-  if (typeof w.matchMedia === 'function') return w.matchMedia('(max-width: 767px)').matches;
-  return w.innerWidth <= 767;
 }
 
 /**
@@ -334,6 +326,11 @@ function openAdModal(modal: AdModal, gpt: Googletag): Promise<void> {
 
   return new Promise<void>((resolve) => {
     const finish = () => {
+      // Move focus out of the modal before hiding it: leaving the Close button
+      // focused inside a subtree we are about to mark aria-hidden makes the
+      // browser log "Blocked aria-hidden ... descendant retained focus".
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && modal.root.contains(focused)) focused.blur();
       modal.root.classList.remove('inter--open');
       modal.root.setAttribute('aria-hidden', 'true');
       modal.closeBtn.removeEventListener('click', finish);
