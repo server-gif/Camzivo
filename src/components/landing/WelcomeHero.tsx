@@ -40,7 +40,7 @@ export function WelcomeHero({ className }: WelcomeHeroProps) {
     return (
       <img
         src="/icons/Frame 1851.png"
-        alt="A video-call camera surrounded by profile avatars of people connecting"
+        alt="A video-call camera surrounded by profile avatars of people  connecting"
         className={cn('mx-auto w-full max-w-[19rem] sm:max-w-[22rem]', className)}
       />
     );

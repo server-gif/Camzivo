@@ -18,7 +18,8 @@
  * BOTTOM_ANCHOR format (the GPT equivalent of AdSense anchor ads, see
  * support.google.com/adsense/answer/15484692): a dismissible strip that sticks
  * to the bottom edge of the screen and can expand into a dynamic anchor —
- * Google injects and owns that overlay, we only define and rotate the slot.
+ * Google injects and owns that overlay; we only mount, rotate and tear it down
+ * per route, and never on the home screen (see `AdAnchor`).
  * (GPT's enum has no plain `ANCHOR` key — checking for one silently killed the
  * whole placement, which is the bug this comment documents.) The interstitial
  * instead uses
@@ -179,22 +180,10 @@ export function getGpt(): Promise<Googletag | null> {
         rewardedSlot = null;
       }
 
-      // Define the Google-managed out-of-page anchor slot now, before
-      // enableServices(), so its first request joins the initial load. The
-      // format comes from `anchorFormat` (BOTTOM_ANCHOR on current GPT builds);
-      // when the loaded build offers no anchor format at all we skip defining
-      // the slot, since an undefined format would make defineOutOfPageSlot fall
-      // back to an interstitial. The unit comes from the odd/even rotation
-      // (first tag); `rotateAnchor` swaps to the other one on every navigation.
-      try {
-        const anchorFmt = anchorFormat(oop);
-        if (anchorFmt != null) {
-          anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), anchorFmt) ?? null;
-          if (anchorSlot) anchorSlot.addService(pubads);
-        }
-      } catch {
-        anchorSlot = null;
-      }
+      // The Google-managed anchor is deliberately NOT defined here. It must stay
+      // off the home screen, so `AdAnchor` mounts it through `rotateAnchor` only
+      // once the user reaches a non-home route; booting therefore stays anchor-
+      // free (the slot is created after enableServices and refreshed on demand).
 
       // Rewarded fires this when the fetched ad is ready. Only reveal it once the
       // app has asked (Welcome page calls showRewarded); never pop it unprompted.
@@ -210,18 +199,13 @@ export function getGpt(): Promise<Googletag | null> {
       // Deliberately NOT enabling single-request mode: the in-page banner is
       // defined from a React effect that runs *after* enableServices(), so it
       // has to fetch on its own (async rendering) via a targeted refresh. The
-      // out-of-page rewarded and anchor slots are defined above, before it.
+      // out-of-page rewarded slot is defined above, before it.
       gpt.enableServices();
 
       // Render the rewarded slot now rather than at ask time: the overlay can
       // only be shown once GPT has built it, so warming it here is what lets a
       // page deeper in the flow (the girl-find screen) show it immediately.
       if (rewardedSlot) reveal(gpt, rewardedSlot);
-
-      // Render the managed anchor overlay too. It is a persistent, Google-
-      // owned strip (collapse/dismiss UI included) that follows the user
-      // across routes, so revealing it once at boot puts it on every page.
-      if (anchorSlot) reveal(gpt, anchorSlot);
 
       // Build the custom interstitial modal and fire its first request now, so
       // the creative is loaded before the user acts.
@@ -415,11 +399,12 @@ export function warmRewarded(): void {
 }
 
 /**
- * Rebuild the Google-managed anchor on the *next* tag in the odd/even rotation.
- * Called by `AdAnchor` on every navigation: the current overlay is destroyed,
- * a fresh out-of-page BOTTOM_ANCHOR slot is defined on the other unit, revealed,
- * and requested — so an empty unit transparently hands over to its pair across
- * page views. With a single configured tag this is a plain re-fetch.
+ * Mount or swap the Google-managed anchor on the *next* tag in the odd/even
+ * rotation. Called by `AdAnchor` on every non-home route: any current overlay is
+ * destroyed, a fresh out-of-page BOTTOM_ANCHOR slot is defined on the other
+ * unit, revealed, and requested — so this both mounts the anchor on the first
+ * eligible view and hands an empty unit over to its pair across page views. With
+ * a single configured tag it is a plain re-fetch.
  */
 export function rotateAnchor(): void {
   if (!gamEnabled || typeof document === 'undefined') return;
@@ -446,6 +431,28 @@ export function rotateAnchor(): void {
       }
     } catch {
       anchorSlot = null;
+    }
+  });
+}
+
+/**
+ * Tear down the Google-managed anchor overlay (if one is mounted). Called by
+ * `AdAnchor` when the user reaches a route that must not show an anchor (the
+ * home/welcome screen), so the strip is removed and no anchor request stays
+ * live. A no-op when nothing is mounted — it deliberately does not boot GPT
+ * just to clear nothing.
+ */
+export function clearAnchor(): void {
+  if (!gamEnabled || typeof document === 'undefined') return;
+  const slot = anchorSlot;
+  if (!slot) return;
+  anchorSlot = null;
+  void getGpt().then((gpt) => {
+    if (!gpt) return;
+    try {
+      gpt.destroySlots([slot]);
+    } catch {
+      /* a slot that refuses to die is already dropped from our reference */
     }
   });
 }

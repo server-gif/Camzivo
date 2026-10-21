@@ -27,17 +27,19 @@ const LEGAL_LINKS = [
 
 /**
  * The single bordered panel every flow screen renders inside — welcome, age,
- * gender and the live-video grid all share it, so the content always sits in
- * the same centered card on phones and desktop instead of spreading full width.
- * The panel grows with its content (`min-h-dvh`) so the whole page uses the
- * browser's main scrollbar — there is deliberately no inner scroll container.
+ * gender and the live-video grid all share it. On phones it fills the viewport
+ * edge-to-edge (`w-full`, no max-width) so the page's `bg-glow` never peeks out
+ * as a coloured strip beside the panel; from the `sm` breakpoint up it becomes
+ * the centered, portrait 393px card. The panel grows with its content
+ * (`min-h-dvh`) so the whole page uses the browser's main scrollbar — there is
+ * deliberately no inner scroll container.
  */
 export function FlowPanel({ children, className, showLegalLine = true }: FlowPanelProps) {
   return (
     <PageContainer showNav={false} showFooter={false} showHeader={false} className="bg-glow">
       <div
         className={cn(
-          'mx-auto flex min-h-dvh w-full max-w-[393px] flex-col gap-0 bg-plum-950/90  shadow-[0_24px_80px_-32px] shadow-black/70',
+          'mx-auto flex min-h-dvh w-full flex-col gap-0 p-5 bg-plum-950/90 shadow-[0_24px_80px_-32px] shadow-black/70 sm:max-w-[393px]',
           className,
         )}
       >

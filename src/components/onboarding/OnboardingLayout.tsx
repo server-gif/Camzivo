@@ -35,7 +35,7 @@ type OnboardingLayoutProps = {
 export function OnboardingLayout({ step, title, titleTyping, description, children, footer, footerNote, className }: OnboardingLayoutProps) {
   return (
     <FlowPanel className={className}>
-      <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col">
+      <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col ">
         {step != null ? (
           <div className="shrink-0">
             <ProgressIndicator current={step} />
@@ -57,7 +57,7 @@ export function OnboardingLayout({ step, title, titleTyping, description, childr
             </h1>
             {description ? <div className="mx-auto mt-2.5 max-w-sm text-[12px] leading-relaxed text-fg-muted">{description}</div> : null}
           </div>
-          {children ? <div className="mt-[52px] flex-1">{children}</div> : <div className="flex-1" />}
+          {children ? <div className="mt-[52px] flex-1 mb-5">{children}</div> : <div className="flex-1" />}
         </div>
 
         {footer ? (

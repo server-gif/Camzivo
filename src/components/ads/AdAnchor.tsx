@@ -1,25 +1,27 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { gamEnabled } from '@/config/ads';
-import { getGpt, rotateAnchor } from '@/lib/gpt';
+import { clearAnchor, rotateAnchor } from '@/lib/gpt';
+
+/** The home/welcome route, where the anchor ad must NOT appear. */
+const HOME_PATH = '/';
 
 /**
- * The anchor ad shown on every screen. It is the GAM equivalent of an AdSense
- * anchor ad (support.google.com/adsense/answer/15484692): a Google-managed,
- * dismissible strip that sticks to the edge of the viewport — bottom on mobile,
- * side rail on desktop — can expand into a *dynamic anchor*, and serves on both
- * form factors. The out-of-page BOTTOM_ANCHOR slot is defined and revealed once
- * inside `getGpt` (see `src/lib/gpt.ts`), so this component's first job is to make
- * sure GPT has booted; Google injects and owns the overlay (collapse/dismiss UI
- * included), so we render no DOM of our own. When `VITE_GAM_ENABLED` is off it
- * does nothing. Because it lives in RootLayout, booting it here puts the anchor
- * on every page.
+ * The Google-managed anchor ad — the GPT equivalent of an AdSense anchor ad
+ * (support.google.com/adsense/answer/15484692): a dismissible BOTTOM_ANCHOR
+ * strip that sticks to the bottom edge and can expand into a dynamic anchor.
+ * Google injects and owns the overlay (collapse/dismiss UI included), so this
+ * component renders no DOM of its own; the slot is mounted, swapped and torn
+ * down through `rotateAnchor` / `clearAnchor` in `src/lib/gpt.ts`. When
+ * `VITE_GAM_ENABLED` is off it does nothing.
  *
- * Odd/even tag rotation: on every navigation the component asks `rotateAnchor`
- * to destroy the slot and rebuild it on the *other* configured anchor unit, so
- * both live tags get requests and an empty one hands over to its pair on the
- * next page view. The first render only boots GPT (boot already defined the
- * first tag), and the pathname guard makes StrictMode's double-invoke a no-op.
+ * Placement rule: the anchor is intentionally kept OFF the home/welcome screen
+ * and ON every other route. On a non-home path the effect calls `rotateAnchor`,
+ * which both mounts the anchor (first eligible view) and swaps it to the next
+ * tag in the odd/even rotation (later navigations), so an empty unit hands over
+ * to its pair across page views. On the home path it calls `clearAnchor`, which
+ * tears the overlay down. The same-pathname guard makes StrictMode's immediate
+ * double-invoke a no-op.
  */
 export function AdAnchor() {
   const location = useLocation();
@@ -27,18 +29,13 @@ export function AdAnchor() {
 
   useEffect(() => {
     if (!gamEnabled) return;
-    if (lastPathname.current === null) {
-      // First mount: booting GPT defines + reveals the managed anchor on the
-      // first tag of the rotation.
-      lastPathname.current = location.pathname;
-      void getGpt();
-      return;
-    }
-    if (lastPathname.current !== location.pathname) {
-      // A real navigation: swap the anchor to the next tag in the rotation.
-      lastPathname.current = location.pathname;
-      rotateAnchor();
-    }
+    const path = location.pathname;
+    // Ignore a re-run for the pathname we already handled (StrictMode's
+    // double-invoke, or any effect re-trigger without a real navigation).
+    if (lastPathname.current === path) return;
+    lastPathname.current = path;
+    if (path === HOME_PATH) clearAnchor();
+    else rotateAnchor();
   }, [location.pathname]);
 
   return null;
