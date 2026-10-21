@@ -55,9 +55,9 @@ export function OnboardingLayout({ step, title, titleTyping, description, childr
                 title
               )}
             </h1>
-            {description ? <div className="mx-auto mt-2.5 max-w-sm text-[12px] leading-relaxed text-fg-muted">{description}</div> : null}
+            {description ? <div className="mx-auto mt-2.5 max-w-sm text-[14px]  leading-relaxed text-fg-muted">{description}</div> : null}
           </div>
-          {children ? <div className="mt-[52px] flex-1 mb-5">{children}</div> : <div className="flex-1" />}
+          {children ? <div className="mt-[52px] flex-1 mb-[52px]">{children}</div> : <div className="flex-1" />}
         </div>
 
         {footer ? (
