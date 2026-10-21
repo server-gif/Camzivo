@@ -7,17 +7,26 @@ interface ImportMetaEnv {
    */
   readonly VITE_GAM_ENABLED?: string;
 
-  /** Ad unit path for the top banner shown on every screen. */
-  readonly VITE_GAM_BANNER_AD_UNIT?: string;
+  /** First banner tag; alternates with VITE_GAM_BANNER_AD_UNIT_2 per screen. */
+  readonly VITE_GAM_BANNER_AD_UNIT_1?: string;
 
-  /** Ad unit path for the interstitial fired on Continue and clip taps. */
-  readonly VITE_GAM_INTERSTITIAL_AD_UNIT?: string;
+  /** Second banner tag (optional; leave blank to run a single tag). */
+  readonly VITE_GAM_BANNER_AD_UNIT_2?: string;
 
-  /** Ad unit path for the rewarded ad fired on the Connect button. */
+  /** First interstitial tag; alternates with _2 on every modal refill. */
+  readonly VITE_GAM_INTERSTITIAL_AD_UNIT_1?: string;
+
+  /** Second interstitial tag (optional; leave blank to run a single tag). */
+  readonly VITE_GAM_INTERSTITIAL_AD_UNIT_2?: string;
+
+  /** Ad unit path for the rewarded ad (single tag). */
   readonly VITE_GAM_REWARDED_AD_UNIT?: string;
 
-  /** Ad unit path for the anchor ad pinned to the bottom of the viewport. */
-  readonly VITE_GAM_ANCHOR_AD_UNIT?: string;
+  /** First anchor tag; alternates with _2 on every navigation. */
+  readonly VITE_GAM_ANCHOR_AD_UNIT_1?: string;
+
+  /** Second anchor tag (optional; leave blank to run a single tag). */
+  readonly VITE_GAM_ANCHOR_AD_UNIT_2?: string;
 }
 
 interface ImportMeta {

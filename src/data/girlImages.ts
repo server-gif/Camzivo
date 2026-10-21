@@ -37,6 +37,10 @@ const DEMO_NAMES = [
   'Rina Okafor',
   'Kelsey Marlow',
   'Dara Lindholm',
+  'Elise Navarro',
+  'Priya Anand',
+  'Gemma Hartley',
+  'Noor Haddad',
 ];
 
 export type GirlImage = {
@@ -46,7 +50,21 @@ export type GirlImage = {
   src: string;
   /** Name shown on the card. */
   name: string;
+  /** Whether the card shows a green “Live” badge or a muted red-dot “Offline” one. */
+  live: boolean;
 };
+
+/**
+ * A stable per-file on/offline flag. Deriving it from the file name (rather
+ * than the index or `Math.random`) keeps the same faces offline across reloads
+ * so the grid never flickers, while still scattering them instead of marking
+ * every Nth card. Roughly one in three reads as offline.
+ */
+function isLive(file: string): boolean {
+  let hash = 0;
+  for (let i = 0; i < file.length; i += 1) hash = (hash * 31 + file.charCodeAt(i)) >>> 0;
+  return hash % 3 !== 0;
+}
 
 /** Trailing number in a file name — `stroke bg-12` is 12, `stroke bg` has none. */
 function numberOf(name: string): number | null {
@@ -72,4 +90,8 @@ export const girlImages: GirlImage[] = Object.entries(found)
     if (right !== null) return 1;
     return a.file.localeCompare(b.file);
   })
-  .map((image, index) => ({ ...image, name: DEMO_NAMES[index % DEMO_NAMES.length] ?? image.file }));
+  .map((image, index) => ({
+    ...image,
+    name: DEMO_NAMES[index % DEMO_NAMES.length] ?? image.file,
+    live: isLive(image.file),
+  }));

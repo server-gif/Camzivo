@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { LoaderCircle } from 'lucide-react';
 import { Lottie } from 'lottie-react';
+import { AdBanner } from '@/components/ads/AdBanner';
+import { CrmNote } from '@/components/onboarding/CrmNote';
 import { FlowPanel } from '@/components/layout/FlowPanel';
 import { buttonVariants } from '@/components/ui/button';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -22,6 +24,8 @@ const FINDING_MS = 6000;
  * and a status line takes its place) until the search is reported as done after
  * `FINDING_MS`. The rewarded ad is NOT played on arrival: it now loads the
  * moment the Connect button appears, i.e. once `finding` flips to false.
+ * Tapping Connect (or the scene) opens /connect, which reports that no new
+ * user was found and offers to search again.
  */
 export default function GirlFindPage() {
   usePageTitle('Live Video');
@@ -76,36 +80,80 @@ export default function GirlFindPage() {
   );
 
   return (
-    <FlowPanel showLegalLine={false}>
-      <div className="flex flex-1 items-center justify-center">
-        {/* Tapping the scene only continues once a match has been "found". */}
-        {finding ? (
-          <div className="w-full max-w-[20rem]">{scene}</div>
-        ) : (
-          <Link
-            to="/age"
-            aria-label="Continue"
-            className="block w-full max-w-[20rem] rounded-3xl outline-offset-4 focus-visible:outline-2 focus-visible:outline-violet-soft"
-          >
-            {scene}
-          </Link>
-        )}
+    <FlowPanel>
+      {/* Same staging as the other flow screens: the first block fills the
+          viewport so the Connect button rests at the bottom edge, and the CRM
+          note sits below it in normal flow — the page scrollbar reaches it. */}
+      <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col">
+        <div className="flex flex-1 flex-col">
+          <AdBanner />
+          <div className="flex flex-1 items-center justify-center">
+            {/* Tapping the scene only continues once a match has been "found". */}
+            {finding ? (
+              <div className="w-full max-w-[20rem]">{scene}</div>
+            ) : (
+              <Link
+                to="/connect"
+                aria-label="Continue"
+                className="block w-full max-w-[20rem] rounded-3xl outline-offset-4 focus-visible:outline-2 focus-visible:outline-violet-soft"
+              >
+                {scene}
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="pt-4">
+          {finding ? (
+            <p
+              role="status"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-plum-900/80 px-4 py-4 text-[13px] font-medium text-fg-muted ring-1 ring-white/8"
+            >
+              <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none text-violet-soft" />
+              Finding the right person for you…
+            </p>
+          ) : (
+            <Link to="/connect" className={cn(buttonVariants({ variant: 'gradient', size: 'lg' }), 'w-full')}>
+              Connect
+            </Link>
+          )}
+        </div>
       </div>
 
-      <div className="pt-4">
-        {finding ? (
-          <p
-            role="status"
-            className="flex items-center justify-center gap-2 rounded-2xl bg-plum-900/80 px-4 py-4 text-[13px] font-medium text-fg-muted ring-1 ring-white/8"
-          >
-            <LoaderCircle aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none text-violet-soft" />
-            Finding the right person for you…
-          </p>
-        ) : (
-          <Link to="/age" className={cn(buttonVariants({ variant: 'gradient', size: 'lg' }), 'w-full')}>
-            Connect
-          </Link>
-        )}
+      <div className="pt-6 text-center text-[12.5px] leading-relaxed text-fg-muted">
+        <CrmNote
+          featuresTitle="Why quick matching works"
+          features={[
+            {
+              emoji: '⚡',
+              title: 'Instant matches',
+              text: 'No profiles to scroll and no waiting — the right stranger appears within seconds.',
+            },
+            {
+              emoji: '🔒',
+              title: 'Zero sign-up',
+              text: 'No account, no password and nothing to fill in before the first conversation.',
+            },
+            {
+              emoji: '🌍',
+              title: 'Meet anyone',
+              text: 'Every match comes from a different city, background or timezone.',
+            },
+            {
+              emoji: '👋',
+              title: 'Leave anytime',
+              text: 'One tap ends a conversation and starts a brand-new match — no awkward goodbyes.',
+            },
+          ]}
+          funFact='Most random-chat users stay in the app when their first match arrives in under 30 seconds — patience is literally the product.'
+          stepsTitle="How the matching works?"
+          steps={[
+            'You confirm your age and pick who you want to meet.',
+            'The queue pairs you with the next available stranger.',
+            'The video opens the moment both sides are ready.',
+            'Tap Next and you are back in the queue in one second.',
+          ]}
+        />
       </div>
     </FlowPanel>
   );

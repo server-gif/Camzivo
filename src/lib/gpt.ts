@@ -17,10 +17,12 @@
  * modal (`.inter` in globals.css), mirroring the reference site: the modal is
  * kept in the DOM permanently and pre-filled, and `showInterstitial` reveals it
  * on every Continue click. Navigation is held until the user taps Close (or
- * presses Escape), then the slot is re-requested so the next click is ready.
+ * presses Escape), then the slot is re-requested so the next click is ready —
+ * and when two interstitial tags are configured, that refill re-defines the
+ * slot on the *other* tag (odd/even rotation, see `nextAdUnit`).
  */
 
-import { adUnits, gamEnabled } from '@/config/ads';
+import { adUnits, gamEnabled, nextAdUnit } from '@/config/ads';
 
 const GPT_SRC = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js';
 const GPT_SCRIPT_ID = 'gam-gpt-loader';
@@ -87,6 +89,11 @@ let rewardedSlot: GptSlot | null = null;
 let rewardedReadyEvent: GptEvent | null = null;
 let rewardedWanted = false;
 
+// Google-managed out-of-page anchor ad (the GAM equivalent of an AdSense anchor
+// ad): a dismissible strip that sticks to the viewport edge (bottom on mobile,
+// side on desktop) and follows the user across every page. Defined once at boot.
+let anchorSlot: GptSlot | null = null;
+
 // Persistent custom modal for the interstitial. It is built once at boot and
 // kept in the DOM (hidden) so GPT renders the creative into an in-page slot
 // inside it; we reveal/hide it on demand. `hasAd` tracks whether the last
@@ -99,6 +106,9 @@ type AdModal = {
   closeBtn: HTMLElement;
   slot: GptSlot | null;
   hasAd: boolean;
+  divId: string;
+  sizes: unknown[];
+  targeting?: Record<string, string>;
 };
 let interstitialModal: AdModal | null = null;
 
@@ -134,6 +144,21 @@ export function getGpt(): Promise<Googletag | null> {
         rewardedSlot = null;
       }
 
+      // Define the out-of-page anchor slot now, before enableServices(), so its
+      // first request joins the initial load. Guarded on the enum existing: an
+      // undefined format would make defineOutOfPageSlot fall back to an
+      // interstitial, which is not what we want here. The unit comes from the
+      // odd/even rotation (first tag); `rotateAnchor` swaps to the other one on
+      // every navigation.
+      try {
+        if (oop?.ANCHOR != null) {
+          anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
+          if (anchorSlot) anchorSlot.addService(pubads);
+        }
+      } catch {
+        anchorSlot = null;
+      }
+
       // Rewarded fires this when the fetched ad is ready. Only reveal it once the
       // app has asked (Welcome page calls showRewarded); never pop it unprompted.
       try {
@@ -145,9 +170,10 @@ export function getGpt(): Promise<Googletag | null> {
         /* older builds without the event still resolve via the timeout */
       }
 
-      // Deliberately NOT enabling single-request mode: the in-page banner and
-      // anchor are defined from React effects that run *after* enableServices(),
-      // so each has to fetch on its own (async rendering) via a targeted refresh.
+      // Deliberately NOT enabling single-request mode: the in-page banner is
+      // defined from a React effect that runs *after* enableServices(), so it
+      // has to fetch on its own (async rendering) via a targeted refresh. The
+      // out-of-page rewarded and anchor slots are defined above, before it.
       gpt.enableServices();
 
       // Render the rewarded slot now rather than at ask time: the overlay can
@@ -155,10 +181,14 @@ export function getGpt(): Promise<Googletag | null> {
       // page deeper in the flow (the girl-find screen) show it immediately.
       if (rewardedSlot) reveal(gpt, rewardedSlot);
 
+      // Render the anchor overlay too. It is a persistent, Google-managed strip
+      // that stays on screen across all routes, so revealing it once at boot is
+      // all that is needed to have it on every page.
+      if (anchorSlot) reveal(gpt, anchorSlot);
+
       // Build the custom interstitial modal and fire its first request now, so
       // the creative is loaded before the user acts.
       interstitialModal = createAdModal(gpt, {
-        adUnit: adUnits.interstitial,
         divId: INTERSTITIAL_DIV_ID,
         sizes: INTERSTITIAL_SIZES,
         targeting: { format: 'interstitial' },
@@ -180,7 +210,7 @@ export function getGpt(): Promise<Googletag | null> {
 }
 
 /**
- * Define an ordinary in-page slot (banner / sticky anchor) and render it into
+ * Define an ordinary in-page slot (the top banner) and render it into
  * the div identified by `divId`, which must already exist in the document.
  *
  * Self-healing across remounts: the banner lives inside the per-screen layout,
@@ -294,6 +324,39 @@ export function warmRewarded(): void {
   });
 }
 
+/**
+ * Rebuild the out-of-page anchor on the *next* tag in the odd/even rotation.
+ * Called by `AdAnchor` on every navigation: the current Google-managed strip is
+ * destroyed, a fresh slot is defined on the other anchor unit and revealed, and
+ * its request is fired. With a single configured tag this is a plain re-fetch.
+ */
+export function rotateAnchor(): void {
+  if (!gamEnabled || typeof document === 'undefined') return;
+  void getGpt().then((gpt) => {
+    if (!gpt) return;
+    const pubads = gpt.pubads();
+    try {
+      if (anchorSlot) gpt.destroySlots([anchorSlot]);
+    } catch {
+      /* a slot that refuses to die is still dropped from our reference */
+    }
+    anchorSlot = null;
+    const oop = gpt.enums?.OutOfPageFormat;
+    if (oop?.ANCHOR == null) return;
+    try {
+      anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
+      if (anchorSlot) {
+        anchorSlot.addService(pubads);
+        reveal(gpt, anchorSlot);
+        // The slot was defined after enableServices(), so ask for it explicitly.
+        pubads.refresh([anchorSlot], { changeCorrelator: false });
+      }
+    } catch {
+      anchorSlot = null;
+    }
+  });
+}
+
 /** Reveal a modal (if filled), resolve on Close/Escape, then refill for next time. */
 function openAdModal(modal: AdModal, gpt: Googletag): Promise<void> {
   if (!modal.slot) return Promise.resolve();
@@ -327,7 +390,6 @@ function openAdModal(modal: AdModal, gpt: Googletag): Promise<void> {
 }
 
 type AdModalSpec = {
-  adUnit: string;
   divId: string;
   sizes: unknown[];
   targeting?: Record<string, string>;
@@ -356,45 +418,84 @@ function createAdModal(gpt: Googletag, spec: AdModalSpec): AdModal | null {
   document.body.appendChild(root);
 
   const closeBtn = root.querySelector('.inter__close') as HTMLElement;
-  const modal: AdModal = { root, closeBtn, slot: null, hasAd: false };
+  const modal: AdModal = {
+    root,
+    closeBtn,
+    slot: null,
+    hasAd: false,
+    divId: spec.divId,
+    sizes: spec.sizes,
+    targeting: spec.targeting,
+  };
 
   try {
-    const pubads = gpt.pubads();
-    pubads.addEventListener('slotRenderEnded', (event) => {
+    gpt.pubads().addEventListener('slotRenderEnded', (event) => {
       if (event.slot && event.slot.getSlotElementId() === spec.divId) {
         modal.hasAd = event.isEmpty !== true;
       }
     });
-
-    const slot = gpt.defineSlot(spec.adUnit, spec.sizes, spec.divId);
-    if (slot) {
-      try {
-        // setConfig is the current API (slot.setTargeting is deprecated); fall
-        // back to it on builds without setConfig. Purely a nicety — the unit path
-        // already declares the format.
-        if (spec.targeting) {
-          if (typeof slot.setConfig === 'function') slot.setConfig({ targeting: spec.targeting });
-          else {
-            for (const [key, value] of Object.entries(spec.targeting)) slot.setTargeting?.(key, value);
-          }
-        }
-      } catch {
-        /* targeting is a nicety; the unit path already describes the format */
-      }
-      slot.addService(pubads);
-      modal.slot = slot;
-      gpt.display(spec.divId);
-      // Services were already enabled, so request this slot explicitly.
-      pubads.refresh([slot]);
-    }
+    rotateAdModalSlot(modal, gpt);
   } catch {
     /* modal stays but never opens; callers fall back / proceed without an ad */
   }
   return modal;
 }
 
-/** Re-request a modal's creative (full refresh) so the next open is filled. */
+/**
+ * Re-request the modal's creative on the *next* tag in the odd/even rotation:
+ * the old slot is destroyed, the card div is cleared, and a brand-new slot is
+ * defined on the other interstitial unit before being displayed and refreshed.
+ * With only one configured tag `nextAdUnit` returns the same path, so this
+ * degrades to a plain re-fetch of the same unit.
+ */
+function rotateAdModalSlot(modal: AdModal, gpt: Googletag): void {
+  try {
+    const pubads = gpt.pubads();
+    const stale = pubads
+      .getSlots()
+      .filter((existing) => existing.getSlotElementId() === modal.divId);
+    if (stale.length > 0) gpt.destroySlots(stale);
+    const card = document.getElementById(modal.divId);
+    if (card) card.innerHTML = '';
+    modal.hasAd = false;
+    modal.slot = null;
+
+    const slot = gpt.defineSlot(nextAdUnit('interstitial'), modal.sizes, modal.divId);
+    if (!slot) return;
+    try {
+      // setConfig is the current API (slot.setTargeting is deprecated); fall
+      // back to it on builds without setConfig. Purely a nicety — the unit path
+      // already declares the format.
+      if (modal.targeting) {
+        if (typeof slot.setConfig === 'function') slot.setConfig({ targeting: modal.targeting });
+        else {
+          for (const [key, value] of Object.entries(modal.targeting)) slot.setTargeting?.(key, value);
+        }
+      }
+    } catch {
+      /* targeting is a nicety; the unit path already describes the format */
+    }
+    slot.addService(pubads);
+    modal.slot = slot;
+    gpt.display(modal.divId);
+    // Services were already enabled, so request this slot explicitly. A full
+    // refresh (default correlator) is what returns a new creative.
+    pubads.refresh([slot]);
+  } catch {
+    /* best-effort: a failed refill just leaves the modal closed next time */
+  }
+}
+
+/**
+ * Re-request a modal's creative so the next open is filled: with two tags
+ * configured the slot is rebuilt on the other unit (odd/even rotation); with
+ * one tag it is a plain full refresh of the existing slot.
+ */
 function refillAdModal(modal: AdModal, gpt: Googletag): void {
+  if (adUnits.interstitial.length > 1) {
+    rotateAdModalSlot(modal, gpt);
+    return;
+  }
   if (!modal.slot) return;
   try {
     // A full refresh (default correlator) is required to re-fill the same slot;

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { adUnits, gamEnabled } from '@/config/ads';
+import { gamEnabled, nextAdUnit } from '@/config/ads';
 import { getGpt, mountInPageSlot } from '@/lib/gpt';
 
 /**
@@ -18,7 +18,9 @@ const BANNER_DIV_ID = 'gam-banner-slot';
  * "Advertisement" frame that inherits the card's width and padding. Because it
  * lives in the per-screen layout it remounts on every navigation; mountInPageSlot
  * destroys the previous screen's slot first, so the fixed div id stays valid.
- * When `VITE_GAM_ENABLED` is off it renders nothing at all.
+ * Each remount takes the next banner tag from the odd/even rotation, so both
+ * configured units keep receiving requests. When `VITE_GAM_ENABLED` is off it
+ * renders nothing at all.
  */
 export function AdBanner() {
   const mounted = useRef(false);
@@ -34,7 +36,7 @@ export function AdBanner() {
     void (async () => {
       const gpt = await getGpt();
       if (!gpt) return;
-      mountInPageSlot(gpt, adUnits.banner, BANNER_SIZES, BANNER_DIV_ID);
+      mountInPageSlot(gpt, nextAdUnit('banner'), BANNER_SIZES, BANNER_DIV_ID);
     })();
   }, []);
 

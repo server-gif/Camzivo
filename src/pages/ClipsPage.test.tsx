@@ -45,7 +45,8 @@ describe('live grid', () => {
 
   it('names each card, in the order the pictures sort into', () => {
     const { cards } = setup();
-    expect(cards().map((card) => card.textContent?.replace('Live', '').trim())).toEqual(
+    // Strip the status badge text (Live or Offline) so only the name remains.
+    expect(cards().map((card) => card.textContent?.replace(/Live|Offline/, '').trim())).toEqual(
       girlImages.map((image) => image.name),
     );
   });
@@ -54,8 +55,16 @@ describe('live grid', () => {
     const { cards } = setup();
     for (const card of cards()) {
       expect(card.querySelector('a')).toHaveAttribute('href', '/girl-find');
-      expect(card).toHaveTextContent('Live');
+      // Each card carries a status badge — green “Live” or a red-dot “Offline”.
+      expect(card.textContent).toMatch(/Live|Offline/);
     }
     expect(screen.getByRole('heading', { name: /live video call/i })).toBeInTheDocument();
+  });
+
+  it('shows a mix of live and offline faces', () => {
+    const { cards } = setup();
+    const texts = cards().map((card) => card.textContent ?? '');
+    expect(texts.some((text) => /Offline/.test(text))).toBe(true);
+    expect(texts.some((text) => /Live/.test(text))).toBe(true);
   });
 });

@@ -37,7 +37,7 @@ describe('welcome step', () => {
     expect(screen.queryByText(/draft — not yet reviewed/i)).not.toBeInTheDocument();
   });
 
-  it('shows the footer on every flow screen except the final Lottie page', async () => {
+  it('shows the legal line on every flow screen including the final Lottie page', async () => {
     // Welcome is step 0 of the flow. It does NOT get the full site `<footer>`
     // (that one is reserved for the standalone info pages); instead the panel
     // renders a thin “About · Privacy Policy · Terms & Conditions” line below
@@ -50,10 +50,11 @@ describe('welcome step', () => {
     // And the heavy site footer must not appear here.
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
 
-    // The last Lottie screen (“finding someone”) opts out of the legal line
-    // too, to keep its staging single-frame.
+    // The last Lottie screen (“finding someone”) shows the same legal line as
+    // the other flow screens now that the CRM note scrolls below it.
     await router.navigate('/girl-find');
-    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Legal' })).not.toBeInTheDocument());
+    const findLegal = await screen.findByRole('navigation', { name: 'Legal' });
+    expect(within(findLegal).getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
   });
 });
@@ -132,6 +133,19 @@ describe('full onboarding flow', () => {
     const { router } = renderRoute('/clips', adult);
     expect(await screen.findByRole('heading', { name: /what.s your gender/i })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/gender');
+  });
+});
+
+describe('connect result', () => {
+  it('apologises when no new user is found and offers to search again', async () => {
+    const { user, router } = renderRoute('/connect');
+    // The copy is revealed with a typewriter effect, so wait for the full
+    // string to finish typing before asserting on it.
+    expect(await screen.findByText(/try again to meet someone new/i, undefined, { timeout: 8000 })).toBeInTheDocument();
+    // The “meet someone new!” tap plays the interstitial first (a no-op with
+    // GAM off in tests), then routes to /age to restart the flow.
+    await user.click(await screen.findByRole('link', { name: /meet someone new/i }));
+    expect(router.state.location.pathname).toBe('/age');
   });
 });
 

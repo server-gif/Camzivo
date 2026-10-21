@@ -1,5 +1,6 @@
 import { FolderOpen } from 'lucide-react';
 import { Link } from 'react-router';
+import { AdBanner } from '@/components/ads/AdBanner';
 import { FlowPanel } from '@/components/layout/FlowPanel';
 import { CrmNote } from '@/components/onboarding/CrmNote';
 import { ClipCard } from '@/components/video/ClipCard';
@@ -13,6 +14,8 @@ export default function ClipsPage() {
 
   return (
     <FlowPanel>
+      {/* Boxed Google ad sits directly above the screen title, like every page. */}
+      <AdBanner />
       <div className="pt-4.5 pb-4.5">
         <h1 className="text-center text-[20px] font-bold text-white">Live Video Call</h1>
       </div>

@@ -8,8 +8,10 @@ type ClipCardProps = {
 
 /**
  * One card on the live-video grid: the picture edge-to-edge inside a rounded
- * frame, a green "Live" badge on the top-left corner and an avatar with the
- * name on the bottom-left, so the grid reads as a wall of calls going on now.
+ * frame, a status badge on the top-left corner and an avatar with the name on
+ * the bottom-left, so the grid reads as a wall of calls. The badge is green
+ * “Live” when the face is available and a muted “Offline” with a red dot when
+ * it is not (see `live` in `@/data/girlImages`).
  *
  * The exported files are not plain photos. Each one is a smaller photo with a
  * light stroke and rounded corners drawn around it, floating on a transparent
@@ -64,11 +66,19 @@ export function ClipCard({ image, className }: ClipCardProps) {
         <span className="truncate text-sm font-medium text-white drop-shadow-sm">{image.name}</span>
       </span>
 
-      {/* Live badge flush at the top-left corner. */}
-      <span className="pointer-events-none absolute left-0 top-0 flex items-center gap-1.5 rounded-br-2xl bg-live px-3 py-1.5 text-sm font-semibold text-white shadow-sm">
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-white" />
-        Live
-      </span>
+      {/* Status badge flush at the top-left corner: green “Live” or a muted
+          “Offline” with a red dot. */}
+      {image.live ? (
+        <span className="pointer-events-none absolute left-0 top-0 flex items-center gap-1.5 rounded-br-2xl bg-live px-3 py-1.5 text-sm font-semibold text-white shadow-sm">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-white" />
+          Live
+        </span>
+      ) : (
+        <span className="pointer-events-none absolute left-0 top-0 flex items-center gap-1.5 rounded-br-2xl bg-ink-950/70 px-3 py-1.5 text-sm font-semibold text-fg-muted ring-1 ring-white/10 backdrop-blur-sm">
+          <span aria-hidden="true" className="size-1.5 rounded-full bg-danger" />
+          Offline
+        </span>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ const AgePage = lazy(() => import('@/pages/AgePage'));
 const GenderPage = lazy(() => import('@/pages/GenderPage'));
 const ClipsPage = lazy(() => import('@/pages/ClipsPage'));
 const GirlFindPage = lazy(() => import('@/pages/GirlFindPage'));
+const UserNotFoundPage = lazy(() => import('@/pages/UserNotFoundPage'));
 const InfoPage = lazy(() => import('@/pages/InfoPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -37,6 +38,7 @@ export const routes: RouteObject[] = [
         ),
       },
       { path: '/girl-find', element: <GirlFindPage /> },
+      { path: '/connect', element: <UserNotFoundPage /> },
       { path: '/about', element: <InfoPage kind="about" /> },
       { path: '/privacy', element: <InfoPage kind="privacy" /> },
       { path: '/terms', element: <InfoPage kind="terms" /> },
