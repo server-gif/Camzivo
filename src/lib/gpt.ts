@@ -11,8 +11,10 @@
  * off (which is how the test suite runs). Failures inside the ad stack are
  * swallowed on purpose — an ad error must never strand the user on a page.
  *
- * The rewarded placement uses GPT's *out-of-page* REWARDED format (the only way
- * the `rewarded_web_example` dummy tag renders). The interstitial instead uses
+ * The rewarded placement uses GPT's *out-of-page* REWARDED format, but only on
+ * mobile-shaped viewports — Google wraps the overlay in an un-styleable white
+ * backdrop on desktop, so wide screens fall back to the dark interstitial
+ * modal below. The interstitial instead uses
  * an ordinary *in-page* slot that lives inside a custom blurred full-screen
  * modal (`.inter` in globals.css), mirroring the reference site: the modal is
  * kept in the DOM permanently and pre-filled, and `showInterstitial` reveals it
@@ -29,8 +31,13 @@ const GPT_SCRIPT_ID = 'gam-gpt-loader';
 
 /** How long a rewarded creative may take to arrive before we stop waiting. */
 const REWARDED_FILL_TIMEOUT_MS = 3500;
-/** Cap on how long a *shown* rewarded overlay may hold the app before we move on. */
-const REWARDED_SHOW_TIMEOUT_MS = 20000;
+/**
+ * Safety cap on how long a *shown* rewarded overlay may hold the app. Live
+ * rewarded videos can run well past a minute, so this is deliberately generous
+ * — `rewardedSlotClosed` normally resolves long before it, and a short cap
+ * used to kill playing videos (the "ad auto-closes by itself" bug).
+ */
+const REWARDED_SHOW_TIMEOUT_MS = 120000;
 /** The interstitial in-page slot's div id; it lives inside the modal in the DOM. */
 const INTERSTITIAL_DIV_ID = 'gam-interstitial-slot';
 /** Creative sizes GPT can serve into the modal card for the interstitial unit. */
@@ -89,11 +96,6 @@ let rewardedSlot: GptSlot | null = null;
 let rewardedReadyEvent: GptEvent | null = null;
 let rewardedWanted = false;
 
-// Google-managed out-of-page anchor ad (the GAM equivalent of an AdSense anchor
-// ad): a dismissible strip that sticks to the viewport edge (bottom on mobile,
-// side on desktop) and follows the user across every page. Defined once at boot.
-let anchorSlot: GptSlot | null = null;
-
 // Persistent custom modal for the interstitial. It is built once at boot and
 // kept in the DOM (hidden) so GPT renders the creative into an in-page slot
 // inside it; we reveal/hide it on demand. `hasAd` tracks whether the last
@@ -144,21 +146,6 @@ export function getGpt(): Promise<Googletag | null> {
         rewardedSlot = null;
       }
 
-      // Define the out-of-page anchor slot now, before enableServices(), so its
-      // first request joins the initial load. Guarded on the enum existing: an
-      // undefined format would make defineOutOfPageSlot fall back to an
-      // interstitial, which is not what we want here. The unit comes from the
-      // odd/even rotation (first tag); `rotateAnchor` swaps to the other one on
-      // every navigation.
-      try {
-        if (oop?.ANCHOR != null) {
-          anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
-          if (anchorSlot) anchorSlot.addService(pubads);
-        }
-      } catch {
-        anchorSlot = null;
-      }
-
       // Rewarded fires this when the fetched ad is ready. Only reveal it once the
       // app has asked (Welcome page calls showRewarded); never pop it unprompted.
       try {
@@ -170,21 +157,16 @@ export function getGpt(): Promise<Googletag | null> {
         /* older builds without the event still resolve via the timeout */
       }
 
-      // Deliberately NOT enabling single-request mode: the in-page banner is
-      // defined from a React effect that runs *after* enableServices(), so it
-      // has to fetch on its own (async rendering) via a targeted refresh. The
-      // out-of-page rewarded and anchor slots are defined above, before it.
+      // Deliberately NOT enabling single-request mode: the in-page banner and
+      // anchor are defined from React effects that run *after* enableServices(),
+      // so each has to fetch on its own (async rendering) via a targeted refresh.
+      // The out-of-page rewarded slot is defined above, before it.
       gpt.enableServices();
 
       // Render the rewarded slot now rather than at ask time: the overlay can
       // only be shown once GPT has built it, so warming it here is what lets a
       // page deeper in the flow (the girl-find screen) show it immediately.
       if (rewardedSlot) reveal(gpt, rewardedSlot);
-
-      // Render the anchor overlay too. It is a persistent, Google-managed strip
-      // that stays on screen across all routes, so revealing it once at boot is
-      // all that is needed to have it on every page.
-      if (anchorSlot) reveal(gpt, anchorSlot);
 
       // Build the custom interstitial modal and fire its first request now, so
       // the creative is loaded before the user acts.
@@ -295,18 +277,34 @@ export function showInterstitial(): Promise<void> {
  * Show the rewarded ad (Welcome on mount; girl-find when the Connect button
  * appears) via GPT's native out-of-page REWARDED overlay, using the rewarded
  * unit `adUnits.rewarded`. Rewarded creatives only render through this native
- * overlay — they never fill an in-page slot, so we cannot host them in our own
- * dark modal. The overlay is a cross-origin frame whose look is Google's own: a
- * white backdrop when tested on desktop, a full-screen video on a real mobile
- * viewport. Resolves once the user dismisses it.
+ * overlay on *mobile-shaped* viewports, where it plays as a full-screen video
+ * whose backdrop belongs to Google. On desktop / wide viewports GPT either
+ * refuses the slot ("page is not mobile optimized") or wraps the creative in
+ * a white cross-origin iframe we cannot restyle — so there we fall back to
+ * our own dark modal (fed by the interstitial rotation), which always shows
+ * with the app's plum backdrop instead of white. Resolves once the user
+ * dismisses the ad.
  */
 export function showRewarded(): Promise<void> {
   if (!gamEnabled || typeof document === 'undefined') return Promise.resolve();
 
   return getGpt().then((gpt) => {
     if (!gpt) return;
+    if (!isMobileViewport()) {
+      // Desktop: the native overlay would flash Google's white backdrop, so
+      // show the styleable dark modal on the interstitial rotation instead.
+      if (interstitialModal) return openAdModal(interstitialModal, gpt);
+      return;
+    }
     return showRewardedNative(gpt);
   });
+}
+
+/** Rewarded overlays are only served (and only full-screen) on phone viewports. */
+function isMobileViewport(): boolean {
+  const w = window as Window & { matchMedia?: (query: string) => { matches: boolean } };
+  if (typeof w.matchMedia === 'function') return w.matchMedia('(max-width: 767px)').matches;
+  return w.innerWidth <= 767;
 }
 
 /**
@@ -321,39 +319,6 @@ export function warmRewarded(): void {
   if (!gamEnabled || typeof document === 'undefined') return;
   void getGpt().then((gpt) => {
     if (gpt && !rewardedReadyEvent) requestRewarded(gpt);
-  });
-}
-
-/**
- * Rebuild the out-of-page anchor on the *next* tag in the odd/even rotation.
- * Called by `AdAnchor` on every navigation: the current Google-managed strip is
- * destroyed, a fresh slot is defined on the other anchor unit and revealed, and
- * its request is fired. With a single configured tag this is a plain re-fetch.
- */
-export function rotateAnchor(): void {
-  if (!gamEnabled || typeof document === 'undefined') return;
-  void getGpt().then((gpt) => {
-    if (!gpt) return;
-    const pubads = gpt.pubads();
-    try {
-      if (anchorSlot) gpt.destroySlots([anchorSlot]);
-    } catch {
-      /* a slot that refuses to die is still dropped from our reference */
-    }
-    anchorSlot = null;
-    const oop = gpt.enums?.OutOfPageFormat;
-    if (oop?.ANCHOR == null) return;
-    try {
-      anchorSlot = gpt.defineOutOfPageSlot(nextAdUnit('anchor'), oop.ANCHOR) ?? null;
-      if (anchorSlot) {
-        anchorSlot.addService(pubads);
-        reveal(gpt, anchorSlot);
-        // The slot was defined after enableServices(), so ask for it explicitly.
-        pubads.refresh([anchorSlot], { changeCorrelator: false });
-      }
-    } catch {
-      anchorSlot = null;
-    }
   });
 }
 
@@ -568,16 +533,23 @@ function showRewardedNative(gpt: Googletag): Promise<void> {
     if (ready) {
       try {
         ready.makeRewardedVisible?.();
+        // The overlay is visible now: skip the short fill wait entirely and go
+        // straight to the generous show cap. Without this the fillTimer would
+        // call finish() (and requestRewarded → refresh) 3.5 s into a playing
+        // video, which was the "rewarded ad auto-closes" bug.
+        showTimer = window.setTimeout(finish, REWARDED_SHOW_TIMEOUT_MS);
+        setAdBlur(true);
       } catch {
+        // Could not show it: arm the fill timeout and request a fresh one.
+        fillTimer = window.setTimeout(finish, REWARDED_FILL_TIMEOUT_MS);
         requestRewarded(gpt);
       }
     } else {
       // Nothing pre-fetched is on hand, so ask for one now. The boot listener
       // shows it the instant it fills, because `rewardedWanted` is set.
       requestRewarded(gpt);
+      fillTimer = window.setTimeout(finish, REWARDED_FILL_TIMEOUT_MS);
     }
-
-    fillTimer = window.setTimeout(finish, REWARDED_FILL_TIMEOUT_MS);
   });
 }
 
