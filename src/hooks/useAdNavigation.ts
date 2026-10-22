@@ -8,8 +8,8 @@ export type AdKind = 'interstitial' | 'rewarded';
 /**
  * Navigates behind an ad: the interstitial (Continue / clip taps) plays first,
  * then the route changes. The interstitial is the custom blurred modal in
- * gpt.ts; the rewarded ad (kept here for any click-gated use, though it now
- * auto-plays on the Welcome page mount) is GPT's native out-of-page format.
+ * gpt.ts; the rewarded ad (kept here for any click-gated use; the Welcome page
+ * no longer fires one on mount) is GPT's native out-of-page format.
  * When GAM is off the ad promise resolves immediately, so this behaves like a
  * plain `navigate(to)` — which is exactly how the tests exercise the flow.
  */
