@@ -36,7 +36,7 @@ export default function GenderPage() {
       title="What's your Gender?"
       description="Select your gender and let's create a more tailored experience."
       footer={
-        <Button type="submit" form="gender-form" disabled={isSubmitting} variant="gradient" size="lg" className="w-full">
+        <Button type="submit" form="gender-form" disabled={isSubmitting} variant="gradient" size="lg" className="w-full cursor-pointer">
           Continue
         </Button>
       }

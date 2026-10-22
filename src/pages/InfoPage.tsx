@@ -40,15 +40,6 @@ const CONTENT: Record<InfoPageKind, PageContent> = {
           storage and disappear when the tab closes.
         </p>
   
-        <h2>Built with</h2>
-        <ul>
-          <li>React 19 with TypeScript and Vite.</li>
-          <li>Tailwind CSS v4 for styling and design tokens.</li>
-          <li>React Router v7 for client-side navigation.</li>
-          <li>Lottie animations for the welcome and "finding" scenes.</li>
-          <li>Google Ad Manager (GAM) for optional ad-slot demos.</li>
-        </ul>
-  
         <h2>Who is it for?</h2>
         <p>
           {BRAND_NAME} is a portfolio and learning project aimed at designers and developers who want to see how a video-chat UI can be structured without putting real users at risk. Feel free to
@@ -56,7 +47,7 @@ const CONTENT: Record<InfoPageKind, PageContent> = {
         </p>
   
         <p>
-          Ready to look around? <Link to="/" className="font-medium text-cyan hover:underline">Start a welcome</Link>.
+          Ready to look around? <Link to="/" className="font-medium  text-cyan underline">Start a welcome</Link>.
         </p>
       </>
     ),
@@ -85,7 +76,7 @@ const CONTENT: Record<InfoPageKind, PageContent> = {
         <p>Questions: {CONTACT_EMAIL}</p>
   
         <p>
-          Ready to look around? <Link to="/" className="font-medium text-cyan hover:underline">Start a welcome</Link>.
+          Ready to look around? <Link to="/" className="font-medium text-cyan underline">Start a welcome</Link>.
         </p>
       </>
     ),
@@ -106,7 +97,7 @@ const CONTENT: Record<InfoPageKind, PageContent> = {
         <p>The demo is provided “as is”, without warranties of any kind, and may change or go offline at any time.</p>
   
         <p>
-          Ready to look around? <Link to="/" className="font-medium text-cyan hover:underline">Start a welcome</Link>.
+          Ready to look around? <Link to="/" className="font-medium text-cyan underline">Start a welcome</Link>.
         </p>
       </>
     ),

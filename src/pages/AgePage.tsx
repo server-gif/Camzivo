@@ -63,7 +63,7 @@ export default function AgePage() {
       title="How old are you?"
       description="Choose your range to personalize your profile and experience."
       footer={
-        <Button type="submit" form="age-form" disabled={isSubmitting} variant="gradient" size="lg" className="w-full">
+        <Button type="submit" form="age-form" disabled={isSubmitting} variant="gradient" size="lg" className="w-full cursor-pointer">
           Continue
         </Button>
       }

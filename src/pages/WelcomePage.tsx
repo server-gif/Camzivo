@@ -21,7 +21,7 @@ export default function WelcomePage() {
         <Link
           to="/age"
           onClick={guardLink('interstitial', '/age')}
-          className={cn(buttonVariants({ variant: 'gradient', size: 'lg' }), 'w-full')}
+          className={cn(buttonVariants({ variant: 'gradient', size: 'lg' }), 'w-full cursor-pointer')}
         >
           Continue
         </Link>

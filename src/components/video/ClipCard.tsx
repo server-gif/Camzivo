@@ -15,16 +15,20 @@ type ClipCardProps = {
  *
  * The exported files are not plain photos. Each one is a smaller photo with a
  * light stroke and rounded corners drawn around it, floating on a transparent
- * canvas with a soft shadow: on a 912×1040 canvas the opaque part runs from
- * 96,80 to 803,931 and the solid picture only from about 110,94 to 789,917.
- * `object-cover` on the whole canvas leaves that frame as a pale rim inside the
- * card, so the picture is placed at its own measured box — 134.3% × 126.4% of
- * the card, pulled 16.2% left and 11.4% up — which puts the stroke, the shadow
- * and the drawn corners outside the card and lets the card do the rounding.
- * The card is 5/6 because that is the shape of the solid picture.
+ * canvas with a soft shadow, so the opaque picture only occupies the middle of
+ * the image. The margins differ from file to file (canvas size, border width
+ * and even the photo's own aspect ratio all vary), so no single measured crop
+ * box fits them all — a fixed box either stretches a face or leaves the card's
+ * dark background showing at an edge.
  *
- * A future picture without a frame is cropped the same way: about 4% of its
- * width and 3% of its height, which is what a card this size wants anyway.
+ * Instead the picture fills the card with `size-full object-cover` — which
+ * always covers the whole card while preserving each image's aspect ratio (no
+ * stretching, no empty band) — and is then zoomed with `scale` so the enlarged
+ * frame pushes the transparent stroke margin outside the card, where
+ * `overflow-hidden` clips it. The zoom pivots high (`transform-origin` near the
+ * top) so the extra crop comes off the bottom of the photo — the body — instead
+ * of the top, which keeps the head fully in frame while still clearing the
+ * margins on every edge.
  *
  * The name is the card's text, so the pictures themselves are decorative for
  * screen readers — the link is labelled by the name it shows.
@@ -37,13 +41,17 @@ export function ClipCard({ image, className }: ClipCardProps) {
         className,
       )}
     >
-      {/* A megabyte per picture, so only load the ones being looked at. */}
+      {/* A megabyte per picture, so only load the ones being looked at.
+          `object-cover` guarantees the card is fully covered; the zoom throws the
+          photo's transparent stroke margin past the card edges (clipped away),
+          and pivoting near the top keeps the head in frame. */}
       <img
         src={image.src}
         alt=""
         aria-hidden="true"
         loading="lazy"
-        className="size-full scale-[1.25] object-cover"
+        className="size-full scale-[1.35] object-cover"
+        style={{ transformOrigin: '50% 35%' }}
       />
 
       {/* Soft darkening behind the name so it stays readable over any photo. */}
