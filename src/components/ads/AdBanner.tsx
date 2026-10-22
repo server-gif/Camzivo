@@ -3,11 +3,12 @@ import { gamEnabled } from '@/config/ads';
 import { getGpt, mountRotatingSlot } from '@/lib/gpt';
 
 /**
- * A single medium-rectangle (300x250) — the classic Google "box" ad. Listing
- * wide leaderboard / mobile-banner sizes is what made GPT serve a short, wide
- * strip; pinning one square-ish size forces the box shape.
+ * Banner size group — medium rectangle candidates plus 'fluid' so GAM can also
+ * serve its responsive fluid creative into the same box. Listing wide
+ * leaderboard / mobile-banner sizes is what made GPT serve a short, wide
+ * strip; these square-ish sizes keep the box shape.
  */
-const BANNER_SIZES: unknown[] = [[300, 250]];
+const BANNER_SIZES: unknown[] = [[336, 280], 'fluid', [300, 250]];
 
 /** Unique div id — GPT requires a globally unique slot element id. */
 const BANNER_DIV_ID = 'gam-banner-slot';
@@ -46,8 +47,11 @@ export function AdBanner() {
   return (
     <div className="mt-10 flex w-full flex-col items-center">
       <p className="mb-3 text-center text-[10px] font-medium uppercase tracking-wider text-fg-subtle">Advertisement</p>
-      <div className="flex h-[250px] w-[300px] max-w-full items-center justify-center overflow-hidden ">
-        <div id={BANNER_DIV_ID} aria-hidden="true" className="flex h-full w-full items-center justify-center" />
+      {/* The box must never clamp the creative's height: a fixed size plus
+          overflow-hidden used to cut taller (e.g. fluid) creatives off. The
+          min-height only holds the placeholder area while the slot is empty. */}
+      <div className="flex w-full  items-center justify-center">
+        <div id={BANNER_DIV_ID} aria-hidden="true" className="flex min-h-full w-full items-center justify-center" />
       </div>
     </div>
   );
