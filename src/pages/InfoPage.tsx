@@ -47,7 +47,8 @@ const CONTENT: Record<InfoPageKind, PageContent> = {
         </p>
   
         <p>
-          Ready to look around? <Link to="/" className="font-medium  text-cyan underline">Start a welcome</Link>.
+          Ready to look around? <Link to="/" className="font-medium  text-cyan underline">Start a Live Video
+</Link>.
         </p>
       </>
     ),
@@ -76,7 +77,8 @@ const CONTENT: Record<InfoPageKind, PageContent> = {
         <p>Questions: {CONTACT_EMAIL}</p>
   
         <p>
-          Ready to look around? <Link to="/" className="font-medium text-cyan underline">Start a welcome</Link>.
+          Ready to look around? <Link to="/" className="font-medium text-cyan underline">Start a Live Video
+</Link>.
         </p>
       </>
     ),
@@ -97,7 +99,8 @@ const CONTENT: Record<InfoPageKind, PageContent> = {
         <p>The demo is provided “as is”, without warranties of any kind, and may change or go offline at any time.</p>
   
         <p>
-          Ready to look around? <Link to="/" className="font-medium text-cyan underline">Start a welcome</Link>.
+          Ready to look around? <Link to="/" className="font-medium text-cyan underline">Start a Live Video
+</Link>.
         </p>
       </>
     ),
