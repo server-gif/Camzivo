@@ -26,8 +26,8 @@ export default function GenderPage() {
 
   const onValid = (values: GenderFormValues) => {
     selectGender(values.gender);
-    // The interstitial plays once the gender is stored, then we reach the grid.
-    void navigateWithAd('interstitial', '/clips');
+    // The interstitial plays once the gender is stored, then we reach the call.
+    void navigateWithAd('interstitial', '/girl-find');
   };
 
   return (

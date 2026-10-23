@@ -1,29 +1,48 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { girlImages } from '@/data/girlImages';
 import { renderRoute } from '@/test/renderRoute';
 
-const adult = { ageConfirmed: true };
+const adult = { ageConfirmed: true, genderCompleted: true };
 
-describe('welcome step', () => {
-  it('is the home screen and starts the flow from the Continue button', async () => {
-    const { user, router } = renderRoute('/');
-    expect(await screen.findByRole('heading', { level: 1, name: /Random video call/i })).toBeInTheDocument();
+describe('live grid (home)', () => {
+  it('is the home screen and starts the flow from a card tap', async () => {
+    const { user, router } = renderRoute('/', adult);
+    expect(await screen.findByRole('heading', { level: 1, name: /live video call/i })).toBeInTheDocument();
 
-    await user.click(within(screen.getByRole('main')).getByRole('link', { name: /^continue$/i }));
+    await user.click(within(screen.getByRole('main')).getAllByRole('link', { name: /./ })[0]!);
     expect(router.state.location.pathname).toBe('/age');
     expect(await screen.findByRole('heading', { name: /how old are you/i })).toBeInTheDocument();
   });
 
-  it('shows the four-step progress bar with Welcome active', async () => {
-    renderRoute('/');
+  it('carries a visitor from the grid through age and gender to the call', async () => {
+    const { user, router } = renderRoute('/');
+    // The grid is the gate-free landing screen everyone sees first.
+    expect(await screen.findByRole('heading', { level: 1, name: /live video call/i })).toBeInTheDocument();
+
+    // Tapping the first card starts the flow at the age step.
+    await user.click(within(screen.getByRole('main')).getAllByRole('link', { name: /./ })[0]!);
+    expect(router.state.location.pathname).toBe('/age');
+
+    await user.click(await screen.findByRole('radio', { name: '18-24' }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+    expect(await screen.findByRole('heading', { name: /what.s your gender/i })).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('radio', { name: 'Male' }));
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+
+    // The flow ends on the “finding someone” call screen.
+    expect(router.state.location.pathname).toBe('/girl-find');
+  });
+
+  it('shows the four-step progress bar with Age active on the age screen', async () => {
+    renderRoute('/age');
     const progress = await screen.findByRole('navigation', { name: 'Progress' });
     const items = within(progress).getAllByRole('listitem');
     expect(items).toHaveLength(4);
-    for (const label of ['Welcome', 'Age', 'Gender', 'Live Video']) {
+    for (const label of ['Live Video', 'Age', 'Gender', 'Search']) {
       expect(within(progress).getByText(label)).toBeInTheDocument();
     }
-    expect(items[0]).toHaveAttribute('aria-current', 'step');
+    expect(items[1]).toHaveAttribute('aria-current', 'step');
   });
 
   it('footer links still point at the real info pages', async () => {
@@ -38,11 +57,11 @@ describe('welcome step', () => {
   });
 
   it('shows the legal line on every flow screen including the final Lottie page', async () => {
-    // Welcome is step 0 of the flow. It does NOT get the full site `<footer>`
+    // The home grid does NOT get the full site `<footer>`
     // (that one is reserved for the standalone info pages); instead the panel
     // renders a thin “About · Privacy Policy · Terms & Conditions” line below
     // the existing content.
-    const { router } = renderRoute('/');
+    const { router } = renderRoute('/', adult);
     const legal = await screen.findByRole('navigation', { name: 'Legal' });
     expect(within(legal).getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
     expect(within(legal).getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
@@ -78,8 +97,8 @@ describe('age step', () => {
     const { user, router } = renderRoute('/age', { ageDenied: true });
     expect(await screen.findByRole('heading', { name: /adults only/i })).toBeInTheDocument();
 
-    // Trying to skip ahead redirects back to the closed gate.
-    await router.navigate('/clips');
+    // Trying to skip the age gate on the gender step redirects back to /age.
+    await router.navigate('/gender');
     await waitFor(() => expect(router.state.location.pathname).toBe('/age'));
     expect(await screen.findByRole('heading', { name: /adults only/i })).toBeInTheDocument();
 
@@ -111,31 +130,6 @@ describe('gender step', () => {
   });
 });
 
-describe('full onboarding flow', () => {
-  it('goes welcome → age → gender → live video list', async () => {
-    const { user, router } = renderRoute('/');
-    await user.click(await screen.findByRole('link', { name: /^continue$/i }));
-
-    await user.click(await screen.findByRole('radio', { name: '18-24' }));
-    await user.click(screen.getByRole('button', { name: /continue/i }));
-
-    await user.click(await screen.findByRole('radio', { name: 'Male' }));
-    await user.click(screen.getByRole('button', { name: /continue/i }));
-
-    // The grid lists every picture in public/Video_Girl_image.
-    expect(router.state.location.pathname).toBe('/clips');
-    const [firstCard] = girlImages;
-    if (!firstCard) throw new Error('public/Video_Girl_image has no pictures to show');
-    expect(await screen.findByText(firstCard.name)).toBeInTheDocument();
-  });
-
-  it('sends a half-finished visitor from /clips to the gender step', async () => {
-    const { router } = renderRoute('/clips', adult);
-    expect(await screen.findByRole('heading', { name: /what.s your gender/i })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/gender');
-  });
-});
-
 describe('connect result', () => {
   it('apologises when no new user is found and offers to search again', async () => {
     const { user, router } = renderRoute('/connect');
@@ -143,9 +137,9 @@ describe('connect result', () => {
     // string to finish typing before asserting on it.
     expect(await screen.findByText(/try again to meet someone new/i, undefined, { timeout: 8000 })).toBeInTheDocument();
     // The “meet someone new!” tap plays the interstitial first (a no-op with
-    // GAM off in tests), then routes to /age to restart the flow.
+    // GAM off in tests), then routes to the home page (/) to restart the flow.
     await user.click(await screen.findByRole('link', { name: /meet someone new/i }));
-    expect(router.state.location.pathname).toBe('/age');
+    expect(router.state.location.pathname).toBe('/');
   });
 });
 

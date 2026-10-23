@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { AdBanner } from '@/components/ads/AdBanner';
 import { FlowPanel } from '@/components/layout/FlowPanel';
 import { CrmNote } from '@/components/onboarding/CrmNote';
+import { ProgressIndicator } from '@/components/onboarding/ProgressIndicator';
 import { ClipCard } from '@/components/video/ClipCard';
 import { girlImages } from '@/data/girlImages';
 import { useAdNavigation } from '@/hooks/useAdNavigation';
@@ -14,6 +15,10 @@ export default function ClipsPage() {
 
   return (
     <FlowPanel>
+      {/* The flow progress bar sits at the very top, like the other flow screens. */}
+      <div className="shrink-0">
+        <ProgressIndicator current={0} />
+      </div>
       {/* Boxed Google ad sits directly above the screen title, like every page. */}
       <AdBanner />
       <div className="pt-4.5 pb-4.5">
@@ -26,8 +31,8 @@ export default function ClipsPage() {
             {girlImages.map((image) => (
               <li key={image.file}>
                 <Link
-                  to="/girl-find"
-                  onClick={guardLink('interstitial', '/girl-find')}
+                  to="/age"
+                  onClick={guardLink('interstitial', '/age')}
                   className="block h-full rounded-2xl outline-offset-4 focus-visible:outline-2 focus-visible:outline-violet-soft"
                 >
                   <ClipCard image={image} className="h-full" />

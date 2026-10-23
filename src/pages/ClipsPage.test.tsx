@@ -15,7 +15,7 @@ import ClipsPage from './ClipsPage';
 function setup() {
   const view = render(
     <Providers initialOnboarding={{ ageConfirmed: true, genderCompleted: true }}>
-      <MemoryRouter initialEntries={['/clips']}>
+      <MemoryRouter initialEntries={['/']}>
         <ClipsPage />
       </MemoryRouter>
     </Providers>,
@@ -51,10 +51,10 @@ describe('live grid', () => {
     );
   });
 
-  it('keeps every card a way into the call', () => {
+  it('keeps every card a way into the call flow', () => {
     const { cards } = setup();
     for (const card of cards()) {
-      expect(card.querySelector('a')).toHaveAttribute('href', '/girl-find');
+      expect(card.querySelector('a')).toHaveAttribute('href', '/age');
       // Each card carries a status badge — green “Live” or a red-dot “Offline”.
       expect(card.textContent).toMatch(/Live|Offline/);
     }

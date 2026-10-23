@@ -20,6 +20,6 @@ describe('onboarding storage', () => {
   it('reports the next required step', () => {
     expect(getRequiredStep(initialOnboardingState)).toBe('/age');
     expect(getRequiredStep({ ...initialOnboardingState, ageConfirmed: true })).toBe('/gender');
-    expect(getRequiredStep({ ...initialOnboardingState, ageConfirmed: true, genderCompleted: true })).toBe('/clips');
+    expect(getRequiredStep({ ...initialOnboardingState, ageConfirmed: true, genderCompleted: true })).toBe('/');
   });
 });

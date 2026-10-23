@@ -1,14 +1,14 @@
 import { lazy } from 'react';
-import { createBrowserRouter, type RouteObject } from 'react-router';
-import WelcomePage from '@/pages/WelcomePage';
-import { RequireAge, RequireOnboarding } from './guards';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import ClipsPage from '@/pages/ClipsPage';
+import { RequireAge } from './guards';
 import { RootLayout } from './RootLayout';
 import { RouteError } from './RouteError';
 
-// The welcome step ships in the main bundle; everything else is code-split.
+// The live grid is the landing screen and ships in the main bundle; everything
+// else is code-split.
 const AgePage = lazy(() => import('@/pages/AgePage'));
 const GenderPage = lazy(() => import('@/pages/GenderPage'));
-const ClipsPage = lazy(() => import('@/pages/ClipsPage'));
 const GirlFindPage = lazy(() => import('@/pages/GirlFindPage'));
 const UserNotFoundPage = lazy(() => import('@/pages/UserNotFoundPage'));
 const InfoPage = lazy(() => import('@/pages/InfoPage'));
@@ -19,7 +19,8 @@ export const routes: RouteObject[] = [
     element: <RootLayout />,
     errorElement: <RouteError />,
     children: [
-      { path: '/', element: <WelcomePage /> },
+      // The live grid is the first screen; tapping a card starts the flow.
+      { path: '/', element: <ClipsPage /> },
       { path: '/age', element: <AgePage /> },
       {
         path: '/gender',
@@ -29,14 +30,8 @@ export const routes: RouteObject[] = [
           </RequireAge>
         ),
       },
-      {
-        path: '/clips',
-        element: (
-          <RequireOnboarding>
-            <ClipsPage />
-          </RequireOnboarding>
-        ),
-      },
+      // The grid moved to the home route; keep old /clips links working.
+      { path: '/clips', element: <Navigate to="/" replace /> },
       { path: '/girl-find', element: <GirlFindPage /> },
       { path: '/connect', element: <UserNotFoundPage /> },
       { path: '/about', element: <InfoPage kind="about" /> },

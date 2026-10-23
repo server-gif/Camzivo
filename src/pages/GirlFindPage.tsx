@@ -4,6 +4,7 @@ import { LoaderCircle } from 'lucide-react';
 import { Lottie } from 'lottie-react';
 import { AdBanner } from '@/components/ads/AdBanner';
 import { CrmNote } from '@/components/onboarding/CrmNote';
+import { ProgressIndicator } from '@/components/onboarding/ProgressIndicator';
 import { FlowPanel } from '@/components/layout/FlowPanel';
 import { buttonVariants } from '@/components/ui/button';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -86,6 +87,10 @@ export default function GirlFindPage() {
           bar is sticky so it stays pinned to the screen bottom even while the
           long CRM note below makes the page scrollable on small phones. */}
       <div className="flex min-h-[calc(100dvh-2.5rem)] flex-col">
+        {/* The flow progress bar sits at the very top, like the other flow screens. */}
+        <div className="shrink-0">
+          <ProgressIndicator current={3} />
+        </div>
         <div className="flex flex-1 flex-col">
           <AdBanner />
           <div className="flex flex-1 items-center justify-center">

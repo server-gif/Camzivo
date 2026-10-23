@@ -44,8 +44,8 @@ function Cursor({ hidden }: { hidden: boolean }) {
 /**
  * Reached by tapping Connect on the girl-find screen. The "match" never
  * resolves in this demo, so the screen apologises with a "new user not found"
- * notice and offers a single way out: a button that sends the visitor back to
- * /girl-find to run the search again.
+ * notice and offers a single way out: a "meet someone new!" button that sends
+ * the visitor back to the home page (/) to restart the flow from the top.
  *
  * The description is revealed with a typewriter effect and the CTA fades in
  * once it finishes.
@@ -80,8 +80,8 @@ export default function UserNotFoundPage() {
 
         <div className="pt-4">
           <Link
-            to="/age"
-            onClick={guardLink('interstitial', '/age')}
+            to="/"
+            onClick={guardLink('interstitial', '/')}
             className={cn(
               buttonVariants({ variant: 'gradient', size: 'lg' }),
               'w-full transition-opacity duration-500',

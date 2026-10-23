@@ -60,8 +60,8 @@ export function clearOnboardingState(): void {
 }
 
 /** Which route a visitor should be on, given their progress. */
-export function getRequiredStep(state: OnboardingState): '/age' | '/gender' | '/clips' {
+export function getRequiredStep(state: OnboardingState): '/age' | '/gender' | '/' {
   if (!state.ageConfirmed) return '/age';
   if (!state.genderCompleted) return '/gender';
-  return '/clips';
+  return '/';
 }

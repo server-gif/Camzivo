@@ -1,15 +1,16 @@
 import { cn } from '@/lib/utils';
 
 /**
- * The four onboarding steps shown on every screen. Icons live in
- * `public/icons/`; each step has a muted (inactive) and a gradient
- * (active/completed) variant.
+ * The four flow steps shown on every screen — the live-video grid, age, gender
+ * and the search (girl-find) screen. The connect result screen intentionally
+ * hides the bar. Icons live in `public/icons/`; each step has a muted (inactive)
+ * and a gradient (active/completed) variant.
  */
 export const ONBOARDING_STEPS = [
-  { label: 'Welcome', icon: '/icons/Group 1171279949 (1).png', activeIcon: '/icons/Group 1171279949.png' },
+  { label: 'Live Video', icon: '/icons/Group 1171279948.png', activeIcon: '/icons/Group 1171279949.png' },
   { label: 'Age', icon: '/icons/Group 1171279947.png', activeIcon: '/icons/Group 1171279947 (1).png' },
   { label: 'Gender', icon: '/icons/Group 1171279946.png', activeIcon: '/icons/Group 1171279946 (1).png' },
-  { label: 'Live Video', icon: '/icons/Group 1171279948.png', activeIcon: '/icons/Group 1171279949.png' },
+  { label: 'Search', icon: '/icons/Group 1171279948.png', activeIcon: '/icons/Group 1171279949 (1).png' },
 ] as const;
 
 type ProgressIndicatorProps = {
@@ -22,7 +23,7 @@ export function ProgressIndicator({ current, className }: ProgressIndicatorProps
   return (
     <nav aria-label="Progress" className={cn('mx-auto w-full max-w-md', className)}>
       <p className="sr-only">
-        Step {current + 1} of {ONBOARDING_STEPS.length}: {ONBOARDING_STEPS[current]?.label ?? 'Live Video'}
+        Step {current + 1} of {ONBOARDING_STEPS.length}: {ONBOARDING_STEPS[current]?.label ?? 'Search'}
       </p>
       <ol className="flex items-start">
         {ONBOARDING_STEPS.map((step, index) => {
